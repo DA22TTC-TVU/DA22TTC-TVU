@@ -21,16 +21,16 @@ export default function Home() {
   const shootConfetti = (x: number, y: number) => {
     var defaults = {
       spread: 360,
-      ticks: 60,
+      ticks: 20,
       gravity: 0,
-      decay: 0.94,
+      decay: 0.9,
       startVelocity: 3,
-      colors: ['FFE400', 'FFBD00', 'E89400', 'FFCA6C', 'FDFFB8']
+      colors: ['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#8B00FF']
     };
 
     confetti({
       ...defaults,
-      particleCount: 4,
+      particleCount: 7,
       scalar: 1.2,
       shapes: ['star'],
       origin: { x: x / window.innerWidth, y: y / window.innerHeight }
