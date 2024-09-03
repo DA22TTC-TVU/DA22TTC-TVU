@@ -13,7 +13,7 @@ export default function Home() {
 
   return (
     <div>
-      <div className='bg-black text-center py-12 text-white'>
+      <div className='bg-black text-center py-12 text-white px-4'>
         <h1 className='font-[800] text-3xl'>DA22TTC-TVU</h1>
         <h2 className='font-[600] text-xl mt-3'>Trang web chia sẽ file cấp tốc không đăng nhập cho lớp DA22TTC của TVU.</h2>
         <h2 className='font-[600] text-xl mt-6'>Gửi file ngay</h2>

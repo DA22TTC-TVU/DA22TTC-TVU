@@ -2,6 +2,7 @@
 'use client'
 import React, { useEffect, useState } from 'react';
 import { storage, ref, listAll, getMetadata, getDownloadURL } from '../lib/firebase';
+import { FaFileDownload } from "react-icons/fa";
 
 interface FileData {
     name: string;
@@ -94,36 +95,39 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
     };
 
     return (
-        <div className='bg-gray-100 p-6'>
+        <div className='p-6'>
             {files.length === 0 &&
                 <h2 className='text-xl text-center font-bold'>Hiện không có file nào...</h2>
             }
             {files.length > 0 &&
                 <div>
-                    <h2 className='text-xl font-bold mb-4'>Danh sách file đã tải lên ({formatSize(totalSize)})</h2>
-                    <ul>
+                    <h2 className='text-xl text-center font-bold mb-4'>Danh sách file đã tải lên ({formatSize(totalSize)})</h2>
+                    <div className='flex flex-wrap justify-center items-center'>
                         {files.map(file => (
-                            <li key={file.fullPath} className='mb-4'>
-                                <div className='flex items-center justify-between'>
+                            <div key={file.fullPath} className='mb-4 mx-4'>
+                                <div className='border border-black rounded-xl px-4 py-2'>
                                     <span className='text-blue-600'>{file.name}</span>
-                                    <div className='flex items-center'>
-                                        <span className='text-gray-600 mr-4'>Ngày cập nhật: {formatDateTime(file.updatedAt)}</span>
-                                        <span className='text-gray-600'>Dung lượng: {formatSize(file.size)}</span>
+                                    <span className='text-gray-600'> ({formatSize(file.size)})</span>
+                                    <div className='flex flex-col items-center justify-center'>
+                                        <p className='mt-1 text-gray-600 mr-4'>{formatDateTime(file.updatedAt)}</p>
+                                        <button
+                                            onClick={() => handleDownload(file.fullPath)}
+                                            className='mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600'
+                                            disabled={downloadingFile === file.fullPath}
+                                        >
+                                            <div className='flex justify-center items-center'>
+                                                <FaFileDownload className='mr-2' />
+                                                {downloadingFile === file.fullPath ? 'Đang tải...' : 'Tải về'}
+                                            </div>
+                                        </button>
                                     </div>
-                                    <button
-                                        onClick={() => handleDownload(file.fullPath)}
-                                        className='ml-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600'
-                                        disabled={downloadingFile === file.fullPath}
-                                    >
-                                        {downloadingFile === file.fullPath ? 'Đang tải...' : 'Tải về'}
-                                    </button>
                                 </div>
-                            </li>
+                            </div>
                         ))}
-                    </ul>
-                </div>
+                    </div>
+                </div >
             }
-        </div>
+        </div >
     );
 };
 

@@ -84,7 +84,7 @@ export default function Upload({ onUploadSuccess }: UploadProps) {
                         <span className="ml-2">Tải lên</span>
                     </button>
                     {isUpload && (
-                        <div className="relative w-[25vw] mt-4">
+                        <div className="relative w-[50vw] lg:w-[25vw] mt-4">
                             <div className="absolute top-0 left-0 w-full h-4 bg-gray-200 rounded-full">
                                 <div
                                     className="h-full bg-blue-500 rounded-full transition-all duration-300"
