@@ -1,18 +1,17 @@
 // components/Upload.tsx
 'use client';
-import { FaFileCirclePlus } from 'react-icons/fa6';
-import { FaFileArrowUp } from 'react-icons/fa6';
-import { FaCheck } from "react-icons/fa";
+import { FaFileCirclePlus, FaFileArrowUp, FaCheck } from 'react-icons/fa6';
 import { useState, useEffect, ChangeEvent } from 'react';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage } from '../lib/firebase';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface FileWithPath extends File {
     name: string;
 }
 
 interface UploadProps {
-    onUploadSuccess: () => void; // Callback để thông báo khi tải lên thành công
+    onUploadSuccess: () => void;
 }
 
 export default function Upload({ onUploadSuccess }: UploadProps) {
@@ -41,7 +40,7 @@ export default function Upload({ onUploadSuccess }: UploadProps) {
                 getDownloadURL(uploadTask.snapshot.ref).then(() => {
                     setIsUpload(false);
                     setIsUploaded(true);
-                    onUploadSuccess(); // Gọi callback khi tải lên thành công
+                    onUploadSuccess();
                 });
             }
         );
@@ -57,51 +56,83 @@ export default function Upload({ onUploadSuccess }: UploadProps) {
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             setFile(e.target.files[0]);
-            setProgress(0); // Reset progress khi chọn file mới
+            setProgress(0);
+            setIsUploaded(false);
         }
     };
 
     return (
-        <div className="flex flex-col items-center mt-4">
-            <label className="cursor-pointer flex flex-col items-center">
-                <FaFileCirclePlus size={30} />
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col items-center mt-8 p-6 bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-xl shadow-xl"
+        >
+            <label className="cursor-pointer flex flex-col items-center group">
+                <motion.div
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    className="bg-blue-500 text-white p-4 rounded-full transition-colors duration-300 group-hover:bg-blue-600"
+                >
+                    <FaFileCirclePlus size={40} />
+                </motion.div>
                 <input
                     type="file"
-                    className="hidden" // Ẩn input bằng Tailwind CSS
+                    className="hidden"
                     onChange={handleFileChange}
                 />
-                {file && (
-                    <span className="mt-2 text-center text-sm">{file.name}</span>
-                )}
+                <span className="mt-4 text-lg font-semibold text-blue-200 group-hover:text-blue-300 transition-colors duration-300">
+                    {file ? file.name : "Chọn file để tải lên"}
+                </span>
             </label>
-            {file && (
-                <>
-                    <button
-                        onClick={handleUpload}
-                        className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 flex items-center"
+
+            <AnimatePresence>
+                {file && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="w-full mt-6"
                     >
-                        <FaFileArrowUp size={20} />
-                        <span className="ml-2">Tải lên</span>
-                    </button>
-                    {isUpload && (
-                        <div className="relative w-[50vw] lg:w-[25vw] mt-4">
-                            <div className="absolute top-0 left-0 w-full h-4 bg-gray-200 rounded-full">
-                                <div
-                                    className="h-full bg-blue-500 rounded-full transition-all duration-300"
-                                    style={{ width: `${progress}%` }}
-                                ></div>
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={handleUpload}
+                            className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-6 rounded-lg font-bold text-lg shadow-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-300 flex items-center justify-center"
+                            disabled={isUpload}
+                        >
+                            <FaFileArrowUp size={20} className="mr-3" />
+                            {isUpload ? "Đang tải lên..." : "Tải lên"}
+                        </motion.button>
+
+                        {(isUpload || progress > 0) && (
+                            <div className="mt-6 w-full">
+                                <div className="relative h-4 bg-gray-200 rounded-full overflow-hidden">
+                                    <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${progress}%` }}
+                                        className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-600"
+                                    />
+                                </div>
+                                <div className="mt-2 text-center text-blue-200 font-semibold">
+                                    {Math.round(progress)}%
+                                </div>
                             </div>
-                            <div className='mt-6 text-md'>{Math.round(progress)}%</div>
-                        </div>
-                    )}
-                    {isUploaded && (
-                        <div className='mt-4 flex justify-center items-center text-green-500'>
-                            <FaCheck size={25} className='mx-2' />
-                            <p>Tải lên thành công!</p>
-                        </div>
-                    )}
-                </>
-            )}
-        </div>
+                        )}
+
+                        {isUploaded && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mt-6 flex items-center justify-center text-green-400"
+                            >
+                                <FaCheck size={24} className="mr-3" />
+                                <span className="text-lg font-semibold">Tải lên thành công!</span>
+                            </motion.div>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </motion.div>
     );
 }
