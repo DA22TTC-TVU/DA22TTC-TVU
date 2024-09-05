@@ -1,10 +1,11 @@
 // components/FileList.tsx
 'use client'
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { storage, ref, listAll, getMetadata, getDownloadURL } from '../lib/firebase';
-import { FaFileDownload, FaSearch, FaFilter, FaFileAlt, FaFileWord, FaFileExcel, FaFilePowerpoint, FaFileImage, FaFile, FaFilePdf } from "react-icons/fa";
+import { FaFileDownload, FaSearch, FaFilter, FaFileAlt, FaFileWord, FaFileExcel, FaFilePowerpoint, FaFileImage, FaFile, FaFilePdf, FaSort } from "react-icons/fa";
 import { FaFileZipper } from "react-icons/fa6";
 import { motion, AnimatePresence } from 'framer-motion';
+import { useFloating, useInteractions, useClick, useRole, useDismiss, offset, flip, shift, autoUpdate } from '@floating-ui/react';
 
 interface FileData {
     name: string;
@@ -25,6 +26,48 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
     const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [filterType, setFilterType] = useState<string>('all');
+    const [sortCriteria, setSortCriteria] = useState<'updatedAt' | 'name' | 'size' | 'type'>('updatedAt');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const [isSortOpen, setIsSortOpen] = useState(false);
+    const filterRef = useRef(null);
+    const sortRef = useRef(null);
+
+    const filterFloating = useFloating({
+        open: isFilterOpen,
+        onOpenChange: setIsFilterOpen,
+        middleware: [
+            offset(5),
+            flip(),
+            shift(),
+        ],
+        placement: 'bottom',
+        whileElementsMounted: autoUpdate,
+    });
+
+    const sortFloating = useFloating({
+        open: isSortOpen,
+        onOpenChange: setIsSortOpen,
+        middleware: [
+            offset(5),
+            flip(),
+            shift(),
+        ],
+        placement: 'bottom',
+        whileElementsMounted: autoUpdate,
+    });
+
+    const filterInteractions = useInteractions([
+        useClick(filterFloating.context),
+        useRole(filterFloating.context),
+        useDismiss(filterFloating.context),
+    ]);
+
+    const sortInteractions = useInteractions([
+        useClick(sortFloating.context),
+        useRole(sortFloating.context),
+        useDismiss(sortFloating.context),
+    ]);
 
     useEffect(() => {
         const fetchFiles = async () => {
@@ -130,10 +173,31 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
         }
     };
 
+    const changeSortCriteria = (criteria: 'updatedAt' | 'name' | 'size' | 'type') => {
+        setSortCriteria(criteria);
+        setSortOrder(sortCriteria === criteria ? (sortOrder === 'asc' ? 'desc' : 'asc') : 'desc');
+    };
+
+    const toggleSortOrder = () => {
+        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    };
+
     const filteredFiles = files.filter(file =>
         file.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
         (filterType === 'all' || file.type === filterType)
     );
+
+    const sortedFiles = filteredFiles.sort((a, b) => {
+        if (sortCriteria === 'updatedAt') {
+            return sortOrder === 'asc' ? a.updatedAt - b.updatedAt : b.updatedAt - a.updatedAt;
+        } else if (sortCriteria === 'name') {
+            return sortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+        } else if (sortCriteria === 'size') {
+            return sortOrder === 'asc' ? a.size - b.size : b.size - a.size;
+        } else {
+            return sortOrder === 'asc' ? a.type.localeCompare(b.type) : b.type.localeCompare(a.type);
+        }
+    });
 
     return (
         <motion.div
@@ -159,26 +223,91 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
                     <FaSearch className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' />
                 </div>
                 <div className='flex items-center'>
-                    <FaFilter className='mr-2 text-gray-600' />
-                    <select
-                        className='bg-white border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300'
-                        value={filterType}
-                        onChange={(e) => setFilterType(e.target.value)}
-                    >
-                        <option value='all'>Tất cả</option>
-                        <option value='PDF'>PDF</option>
-                        <option value='Word'>Word</option>
-                        <option value='Excel'>Excel</option>
-                        <option value='PowerPoint'>PowerPoint</option>
-                        <option value='Image'>Hình ảnh</option>
-                        <option value='Archive'>Nén</option>
-                        <option value='Other'>Khác</option>
-                    </select>
+                    <div ref={filterFloating.refs.setReference} className="relative">
+                        <button
+                            className='bg-white border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 flex items-center mr-2'
+                            onClick={() => setIsFilterOpen(!isFilterOpen)}
+                        >
+                            <FaFilter className='mr-2 text-gray-600' />
+                            Lọc
+                        </button>
+                        {isFilterOpen && (
+                            <div
+                                ref={filterFloating.refs.setFloating}
+                                style={{
+                                    ...filterFloating.floatingStyles,
+                                    zIndex: 1000,
+                                }}
+                                {...filterInteractions.getFloatingProps()}
+                            >
+                                <div className='bg-white border border-gray-300 rounded-lg shadow-lg p-2'>
+                                    {['all', 'PDF', 'Word', 'Excel', 'PowerPoint', 'Image', 'Archive', 'Other'].map((type) => (
+                                        <button
+                                            key={type}
+                                            className={`block w-full text-left px-2 py-1 rounded ${filterType === type ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
+                                            onClick={() => {
+                                                setFilterType(type);
+                                                setIsFilterOpen(false);
+                                            }}
+                                        >
+                                            {type === 'all' ? 'Tất cả' : type}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div ref={sortFloating.refs.setReference} className="relative">
+                        <button
+                            className='bg-white border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 flex items-center'
+                            onClick={() => setIsSortOpen(!isSortOpen)}
+                        >
+                            <FaSort className='mr-2' />
+                            Sắp xếp
+                        </button>
+                        {isSortOpen && (
+                            <div
+                                ref={sortFloating.refs.setFloating}
+                                style={{
+                                    ...sortFloating.floatingStyles,
+                                    zIndex: 1000,
+                                }}
+                                {...sortInteractions.getFloatingProps()}
+                            >
+                                <div className='bg-white border border-gray-300 rounded-lg shadow-lg p-2'>
+                                    {['updatedAt', 'name', 'size', 'type'].map((criteria) => (
+                                        <button
+                                            key={criteria}
+                                            className={`block w-full text-left px-2 py-1 rounded ${sortCriteria === criteria ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
+                                            onClick={() => {
+                                                changeSortCriteria(criteria as 'updatedAt' | 'name' | 'size' | 'type');
+                                                setIsSortOpen(false);
+                                            }}
+                                        >
+                                            {criteria === 'updatedAt' ? 'Ngày' :
+                                                criteria === 'name' ? 'Tên' :
+                                                    criteria === 'size' ? 'Kích thước' : 'Loại'}
+                                        </button>
+                                    ))}
+                                    <hr className='my-1' />
+                                    <button
+                                        className={`block w-full text-left px-2 py-1 rounded hover:bg-gray-100`}
+                                        onClick={() => {
+                                            toggleSortOrder();
+                                            setIsSortOpen(false);
+                                        }}
+                                    >
+                                        {sortOrder === 'desc' ? 'Giảm dần' : 'Tăng dần'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </motion.div>
 
             <AnimatePresence>
-                {filteredFiles.length === 0 ? (
+                {sortedFiles.length === 0 ? (
                     <motion.div
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
@@ -214,7 +343,7 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
                             </motion.span>
                         </motion.h2>
                         <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8'>
-                            {filteredFiles.map((file, index) => (
+                            {sortedFiles.map((file, index) => (
                                 <motion.div
                                     key={file.fullPath}
                                     initial={{ opacity: 0, y: 20 }}
@@ -251,7 +380,7 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
                     </motion.div>
                 )}
             </AnimatePresence>
-        </motion.div>
+        </motion.div >
     );
 };
 
