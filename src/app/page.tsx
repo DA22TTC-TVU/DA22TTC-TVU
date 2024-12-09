@@ -2,14 +2,14 @@
 'use client'
 import Upload from '../components/upload';
 import Download from '../components/download';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 export default function Home() {
-  const [refresh, setRefresh] = useState(false);
+  const [refreshKey, setRefreshKey] = useState<number>(0);
 
   const handleUploadSuccess = () => {
-    setRefresh(prev => !prev);
+    setRefreshKey(prev => prev + 1);
   };
 
   return (
@@ -36,7 +36,7 @@ export default function Home() {
           <Upload onUploadSuccess={handleUploadSuccess} />
         </motion.div>
       </motion.div>
-      <Download refresh={refresh} />
+      <Download key={refreshKey} refresh={refreshKey} />
     </div>
   );
 }

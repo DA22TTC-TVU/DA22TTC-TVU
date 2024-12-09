@@ -26,16 +26,41 @@ export default function Upload({ onUploadSuccess }: UploadProps) {
             const formData = new FormData();
             formData.append('file', file);
 
-            const response = await fetch('/api/drive', {
-                method: 'POST',
-                body: formData,
+            const xhr = new XMLHttpRequest();
+
+            xhr.upload.addEventListener('progress', (event) => {
+                if (event.lengthComputable) {
+                    const percentComplete = (event.loaded / event.total) * 100;
+                    setProgress(percentComplete);
+                }
             });
 
-            if (!response.ok) throw new Error('Upload failed');
+            const uploadPromise = new Promise((resolve, reject) => {
+                xhr.onload = () => {
+                    if (xhr.status === 200) {
+                        setTimeout(() => {
+                            setIsUpload(false);
+                            setIsUploaded(true);
+                            onUploadSuccess();
+                        }, 500);
+                        resolve(xhr.response);
+                    } else {
+                        reject(new Error('Upload failed'));
+                    }
+                };
+                xhr.onerror = () => reject(new Error('Upload failed'));
 
-            setIsUpload(false);
-            setIsUploaded(true);
-            onUploadSuccess();
+                xhr.open('POST', '/api/drive');
+                xhr.send(formData);
+            });
+
+            await uploadPromise;
+
+            setTimeout(() => {
+                setFile(null);
+                setProgress(0);
+                setIsUploaded(false);
+            }, 3000);
         } catch (error) {
             console.error('Error uploading file:', error);
             setIsUpload(false);

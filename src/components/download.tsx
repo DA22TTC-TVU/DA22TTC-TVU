@@ -17,7 +17,7 @@ interface FileData {
 }
 
 interface FileListProps {
-    refresh: boolean;
+    refresh: number;
 }
 
 interface DriveFile {
