@@ -2,8 +2,12 @@ import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
 
 const auth = new google.auth.GoogleAuth({
-    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    scopes: ['https://www.googleapis.com/auth/drive.file'],
+    credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS || '{}'),
+    scopes: [
+        'https://www.googleapis.com/auth/drive',
+        'https://www.googleapis.com/auth/drive.readonly',
+        'https://www.googleapis.com/auth/drive.file'
+    ],
 });
 
 const drive = google.drive({ version: 'v3', auth });
@@ -17,19 +21,22 @@ export async function GET(request: Request) {
     }
 
     try {
-        const response: any = await drive.files.get({
+        const file = await drive.files.get({
             fileId: fileId,
-            alt: 'media'
-        }, { responseType: 'arraybuffer' });
+            fields: 'webContentLink, name',
+        });
 
-        return new Response(response.data, {
-            headers: {
-                'Content-Type': 'application/octet-stream',
-                'Cache-Control': 'public, max-age=3600',
-                'ETag': `"${fileId}"`,
-            }
+        if (!file.data.webContentLink) {
+            return NextResponse.json({ error: 'Download link not available' }, { status: 404 });
+        }
+
+        // Trả về URL tải xuống trực tiếp
+        return NextResponse.json({ 
+            downloadUrl: file.data.webContentLink,
+            fileName: file.data.name
         });
     } catch (error) {
-        return NextResponse.json({ error: 'Error downloading file' }, { status: 500 });
+        console.error('Error getting download link:', error);
+        return NextResponse.json({ error: 'Error getting download link' }, { status: 500 });
     }
 } 
