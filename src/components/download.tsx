@@ -5,6 +5,8 @@ import { FaFileDownload, FaSearch, FaFilter, FaFileWord, FaFileExcel, FaFilePowe
 import { FaFileZipper } from "react-icons/fa6";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFloating, useInteractions, useClick, useRole, useDismiss, offset, flip, shift, autoUpdate } from '@floating-ui/react';
+import Skeleton from 'react-loading-skeleton'
+import 'react-loading-skeleton/dist/skeleton.css'
 
 interface FileData {
     id: string;
@@ -39,6 +41,7 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [isSortOpen, setIsSortOpen] = useState(false);
+    const [loading, setLoading] = useState<boolean>(true);
 
     const filterFloating = useFloating({
         open: isFilterOpen,
@@ -78,6 +81,7 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
 
     useEffect(() => {
         const fetchFiles = async () => {
+            setLoading(true);
             try {
                 const response = await fetch('/api/drive');
                 const data = await response.json();
@@ -97,6 +101,8 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
                 setFiles(filesData);
             } catch (error) {
                 console.error("Error fetching files:", error);
+            } finally {
+                setLoading(false);
             }
         };
 
@@ -193,6 +199,22 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
             return sortOrder === 'asc' ? a.type.localeCompare(b.type) : b.type.localeCompare(a.type);
         }
     });
+
+    const FileCardSkeleton = () => (
+        <div className='bg-white rounded-2xl shadow-lg overflow-hidden'>
+            <div className='p-4 sm:p-6 bg-gradient-to-r from-indigo-500 to-purple-600'>
+                <Skeleton height={24} width="80%" />
+                <div className='flex justify-between items-center mt-2'>
+                    <Skeleton height={20} width={60} />
+                    <Skeleton height={20} width={40} />
+                </div>
+            </div>
+            <div className='p-4 sm:p-6'>
+                <Skeleton height={16} width="40%" className="mb-4" />
+                <Skeleton height={40} width="100%" />
+            </div>
+        </div>
+    );
 
     return (
         <motion.div
@@ -302,7 +324,13 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
             </motion.div>
 
             <AnimatePresence>
-                {sortedFiles.length === 0 ? (
+                {loading ? (
+                    <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8'>
+                        {[...Array(6)].map((_, index) => (
+                            <FileCardSkeleton key={index} />
+                        ))}
+                    </div>
+                ) : sortedFiles.length === 0 ? (
                     <motion.div
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}

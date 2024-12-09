@@ -1,8 +1,6 @@
 import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic';
-
 const auth = new google.auth.GoogleAuth({
     keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
     scopes: ['https://www.googleapis.com/auth/drive.file'],
