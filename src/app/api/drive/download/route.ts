@@ -23,7 +23,11 @@ export async function GET(request: Request) {
         }, { responseType: 'arraybuffer' });
 
         return new Response(response.data, {
-            headers: { 'Content-Type': 'application/octet-stream' }
+            headers: {
+                'Content-Type': 'application/octet-stream',
+                'Cache-Control': 'public, max-age=3600',
+                'ETag': `"${fileId}"`,
+            }
         });
     } catch (error) {
         return NextResponse.json({ error: 'Error downloading file' }, { status: 500 });

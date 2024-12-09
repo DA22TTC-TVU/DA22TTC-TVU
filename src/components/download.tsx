@@ -1,10 +1,9 @@
 // components/FileList.tsx
 'use client'
 import React, { useEffect, useState } from 'react';
-import { FaFileDownload, FaSearch, FaFilter, FaFileWord, FaFileExcel, FaFilePowerpoint, FaFileImage, FaFile, FaFilePdf, FaSort } from "react-icons/fa";
+import { FaFileDownload, FaFileWord, FaFileExcel, FaFilePowerpoint, FaFileImage, FaFile, FaFilePdf } from "react-icons/fa";
 import { FaFileZipper } from "react-icons/fa6";
 import { motion, AnimatePresence } from 'framer-motion';
-import { useFloating, useInteractions, useClick, useRole, useDismiss, offset, flip, shift, autoUpdate } from '@floating-ui/react';
 import Skeleton from 'react-loading-skeleton'
 import 'react-loading-skeleton/dist/skeleton.css'
 
@@ -35,79 +34,43 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
     const [files, setFiles] = useState<FileData[]>([]);
     const [totalSize, setTotalSize] = useState<number>(0);
     const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
-    const [searchTerm, setSearchTerm] = useState<string>('');
-    const [filterType, setFilterType] = useState<string>('all');
-    const [sortCriteria, setSortCriteria] = useState<'updatedAt' | 'name' | 'size' | 'type'>('updatedAt');
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-    const [isFilterOpen, setIsFilterOpen] = useState(false);
-    const [isSortOpen, setIsSortOpen] = useState(false);
     const [loading, setLoading] = useState<boolean>(true);
-
-    const filterFloating = useFloating({
-        open: isFilterOpen,
-        onOpenChange: setIsFilterOpen,
-        middleware: [
-            offset(5),
-            flip(),
-            shift(),
-        ],
-        placement: 'bottom',
-        whileElementsMounted: autoUpdate,
-    });
-
-    const sortFloating = useFloating({
-        open: isSortOpen,
-        onOpenChange: setIsSortOpen,
-        middleware: [
-            offset(5),
-            flip(),
-            shift(),
-        ],
-        placement: 'bottom',
-        whileElementsMounted: autoUpdate,
-    });
-
-    const filterInteractions = useInteractions([
-        useClick(filterFloating.context),
-        useRole(filterFloating.context),
-        useDismiss(filterFloating.context),
-    ]);
-
-    const sortInteractions = useInteractions([
-        useClick(sortFloating.context),
-        useRole(sortFloating.context),
-        useDismiss(sortFloating.context),
-    ]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const filesPerPage = 9;
 
     useEffect(() => {
         const fetchFiles = async () => {
             setLoading(true);
             try {
-                const response = await fetch('/api/drive');
+                const response = await fetch(
+                    `/api/drive?page=${currentPage}&limit=${filesPerPage}`,
+                    {
+                        next: {
+                            revalidate: 60
+                        }
+                    }
+                );
+
                 const data = await response.json();
+                setFiles(data.files || []);
+                setTotalPages(Math.ceil(data.totalFiles / filesPerPage));
 
-                const filesData = data.files?.map((file: DriveFile) => ({
-                    id: file.id || '',
-                    name: file.name || '',
-                    mimeType: file.mimeType || '',
-                    size: file.size || '0',
-                    createdTime: file.createdTime || '',
-                    modifiedTime: file.modifiedTime || '',
-                    type: getFileType(file.name || '')
-                })) || [];
+                const newTotalSize = data.files.reduce(
+                    (acc: number, file: FileData) => acc + parseInt(file.size),
+                    0
+                );
+                setTotalSize(newTotalSize);
 
-                const totalSize = filesData.reduce((acc: number, file: FileData) => acc + parseInt(file.size), 0);
-                setTotalSize(totalSize);
-                setFiles(filesData);
             } catch (error) {
-                console.error("Error fetching files:", error);
+                console.error("Lỗi khi tải files:", error);
             } finally {
                 setLoading(false);
             }
         };
 
         fetchFiles();
-    }, [refresh]);
+    }, [currentPage, refresh]);
 
     const getFileType = (fileName: string): string => {
         const extension = fileName.split('.').pop()?.toLowerCase();
@@ -174,32 +137,6 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
         }
     };
 
-    const changeSortCriteria = (criteria: 'updatedAt' | 'name' | 'size' | 'type') => {
-        setSortCriteria(criteria);
-        setSortOrder(sortCriteria === criteria ? (sortOrder === 'asc' ? 'desc' : 'asc') : 'desc');
-    };
-
-    const toggleSortOrder = () => {
-        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    };
-
-    const filteredFiles = files.filter(file =>
-        file.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-        (filterType === 'all' || file.type === filterType)
-    );
-
-    const sortedFiles = filteredFiles.sort((a, b) => {
-        if (sortCriteria === 'updatedAt') {
-            return sortOrder === 'asc' ? a.modifiedTime.localeCompare(b.modifiedTime) : b.modifiedTime.localeCompare(a.modifiedTime);
-        } else if (sortCriteria === 'name') {
-            return sortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-        } else if (sortCriteria === 'size') {
-            return sortOrder === 'asc' ? a.size.localeCompare(b.size) : b.size.localeCompare(a.size);
-        } else {
-            return sortOrder === 'asc' ? a.type.localeCompare(b.type) : b.type.localeCompare(a.type);
-        }
-    });
-
     const FileCardSkeleton = () => (
         <div className='bg-white rounded-2xl shadow-lg overflow-hidden'>
             <div className='p-4 sm:p-6 bg-gradient-to-r from-indigo-500 to-purple-600'>
@@ -216,6 +153,97 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
         </div>
     );
 
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const renderPagination = () => {
+        const pages = [];
+        const maxVisiblePages = 5;
+
+        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+        if (endPage - startPage + 1 < maxVisiblePages) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+
+        // Nút Previous
+        pages.push(
+            <button
+                key="prev"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1 rounded-md bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+            >
+                Trước
+            </button>
+        );
+
+        // Trang đầu
+        if (startPage > 1) {
+            pages.push(
+                <button
+                    key={1}
+                    onClick={() => handlePageChange(1)}
+                    className="px-3 py-1 rounded-md bg-white border border-gray-300 hover:bg-gray-50"
+                >
+                    1
+                </button>
+            );
+            if (startPage > 2) {
+                pages.push(<span key="dots1">...</span>);
+            }
+        }
+
+        // Các trang giữa
+        for (let i = startPage; i <= endPage; i++) {
+            pages.push(
+                <button
+                    key={i}
+                    onClick={() => handlePageChange(i)}
+                    className={`px-3 py-1 rounded-md ${currentPage === i
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white border border-gray-300 hover:bg-gray-50'
+                        }`}
+                >
+                    {i}
+                </button>
+            );
+        }
+
+        // Trang cuối
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                pages.push(<span key="dots2">...</span>);
+            }
+            pages.push(
+                <button
+                    key={totalPages}
+                    onClick={() => handlePageChange(totalPages)}
+                    className="px-3 py-1 rounded-md bg-white border border-gray-300 hover:bg-gray-50"
+                >
+                    {totalPages}
+                </button>
+            );
+        }
+
+        // Nút Next
+        pages.push(
+            <button
+                key="next"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 rounded-md bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+            >
+                Sau
+            </button>
+        );
+
+        return pages;
+    };
+
     return (
         <motion.div
             initial={{ opacity: 0 }}
@@ -227,100 +255,24 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.5, delay: 0.2 }}
-                className='mb-6 flex flex-col sm:flex-row justify-between items-center'
+                className='mb-6'
             >
-                <div className='relative w-full sm:w-64 mb-4 sm:mb-0'>
-                    <input
-                        type='text'
-                        placeholder='Tìm kiếm file...'
-                        className='w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300'
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    <FaSearch className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' />
-                </div>
-                <div className='flex items-center'>
-                    <div ref={filterFloating.refs.setReference} className="relative">
-                        <button
-                            className='bg-white border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 flex items-center mr-2'
-                            onClick={() => setIsFilterOpen(!isFilterOpen)}
-                        >
-                            <FaFilter className='mr-2 text-gray-600' />
-                            Lọc
-                        </button>
-                        {isFilterOpen && (
-                            <div
-                                ref={filterFloating.refs.setFloating}
-                                style={{
-                                    ...filterFloating.floatingStyles,
-                                    zIndex: 1000,
-                                }}
-                                {...filterInteractions.getFloatingProps()}
-                            >
-                                <div className='bg-white border border-gray-300 rounded-lg shadow-lg p-2'>
-                                    {['all', 'PDF', 'Word', 'Excel', 'PowerPoint', 'Image', 'Archive', 'Other'].map((type) => (
-                                        <button
-                                            key={type}
-                                            className={`block w-full text-left px-2 py-1 rounded ${filterType === type ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
-                                            onClick={() => {
-                                                setFilterType(type);
-                                                setIsFilterOpen(false);
-                                            }}
-                                        >
-                                            {type === 'all' ? 'Tất cả' : type}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    <div ref={sortFloating.refs.setReference} className="relative">
-                        <button
-                            className='bg-white border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 flex items-center'
-                            onClick={() => setIsSortOpen(!isSortOpen)}
-                        >
-                            <FaSort className='mr-2' />
-                            Sắp xếp
-                        </button>
-                        {isSortOpen && (
-                            <div
-                                ref={sortFloating.refs.setFloating}
-                                style={{
-                                    ...sortFloating.floatingStyles,
-                                    zIndex: 1000,
-                                }}
-                                {...sortInteractions.getFloatingProps()}
-                            >
-                                <div className='bg-white border border-gray-300 rounded-lg shadow-lg p-2'>
-                                    {['updatedAt', 'name', 'size', 'type'].map((criteria) => (
-                                        <button
-                                            key={criteria}
-                                            className={`block w-full text-left px-2 py-1 rounded ${sortCriteria === criteria ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
-                                            onClick={() => {
-                                                changeSortCriteria(criteria as 'updatedAt' | 'name' | 'size' | 'type');
-                                                setIsSortOpen(false);
-                                            }}
-                                        >
-                                            {criteria === 'updatedAt' ? 'Ngày' :
-                                                criteria === 'name' ? 'Tên' :
-                                                    criteria === 'size' ? 'Kích thước' : 'Loại'}
-                                        </button>
-                                    ))}
-                                    <hr className='my-1' />
-                                    <button
-                                        className={`block w-full text-left px-2 py-1 rounded hover:bg-gray-100`}
-                                        onClick={() => {
-                                            toggleSortOrder();
-                                            setIsSortOpen(false);
-                                        }}
-                                    >
-                                        {sortOrder === 'desc' ? 'Giảm dần' : 'Tăng dần'}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <motion.h2
+                    initial={{ y: -20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ duration: 0.5, delay: 0.3 }}
+                    className='text-2xl sm:text-3xl font-extrabold text-center text-indigo-800 mb-4 sm:mb-8 animate-slideDown'
+                >
+                    Danh sách file
+                    <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ duration: 0.5, delay: 0.5 }}
+                        className='block sm:inline text-base sm:text-lg font-semibold text-indigo-600 mt-2 sm:mt-0 sm:ml-3 bg-indigo-100 px-2 py-1 rounded-full animate-pulse'
+                    >
+                        {formatSize(totalSize.toString())}
+                    </motion.span>
+                </motion.h2>
             </motion.div>
 
             <AnimatePresence>
@@ -330,43 +282,20 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
                             <FileCardSkeleton key={index} />
                         ))}
                     </div>
-                ) : sortedFiles.length === 0 ? (
+                ) : files.length === 0 ? (
                     <motion.div
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0.8, opacity: 0 }}
                         transition={{ duration: 0.5 }}
-                        className='text-center py-8 sm:py-16 bg-white rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105'
+                        className='text-center py-8 sm:py-16 bg-white rounded-xl shadow-lg'
                     >
-                        <h2 className='text-2xl sm:text-3xl font-bold text-indigo-700 animate-pulse'>Không tìm thấy file nào</h2>
-                        <p className='mt-2 sm:mt-4 text-base sm:text-lg text-gray-600'>Hãy thử tìm kiếm với từ khóa khác</p>
+                        <h2 className='text-2xl sm:text-3xl font-bold text-indigo-700'>Không có file nào</h2>
                     </motion.div>
                 ) : (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.5 }}
-                        className='animate-fadeIn'
-                    >
-                        <motion.h2
-                            initial={{ y: -20, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ duration: 0.5, delay: 0.3 }}
-                            className='text-2xl sm:text-3xl font-extrabold text-center text-indigo-800 mb-4 sm:mb-8 animate-slideDown'
-                        >
-                            Danh sách file
-                            <motion.span
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                transition={{ duration: 0.5, delay: 0.5 }}
-                                className='block sm:inline text-base sm:text-lg font-semibold text-indigo-600 mt-2 sm:mt-0 sm:ml-3 bg-indigo-100 px-2 py-1 rounded-full animate-pulse'
-                            >
-                                {formatSize(totalSize.toString())}
-                            </motion.span>
-                        </motion.h2>
+                    <>
                         <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8'>
-                            {sortedFiles.map((file, index) => (
+                            {files.map((file, index) => (
                                 <motion.div
                                     key={file.id}
                                     initial={{ opacity: 0, y: 20 }}
@@ -400,10 +329,16 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
                                 </motion.div>
                             ))}
                         </div>
-                    </motion.div>
+
+                        {!loading && files.length > 0 && (
+                            <div className="mt-8 flex justify-center gap-2">
+                                {renderPagination()}
+                            </div>
+                        )}
+                    </>
                 )}
             </AnimatePresence>
-        </motion.div >
+        </motion.div>
     );
 };
 
