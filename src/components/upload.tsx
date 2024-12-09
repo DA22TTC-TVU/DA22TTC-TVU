@@ -2,8 +2,6 @@
 'use client';
 import { FaFileCirclePlus, FaFileArrowUp, FaCheck } from 'react-icons/fa6';
 import { useState, useEffect, ChangeEvent } from 'react';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { storage } from '../lib/firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface FileWithPath extends File {
@@ -20,30 +18,28 @@ export default function Upload({ onUploadSuccess }: UploadProps) {
     const [isUpload, setIsUpload] = useState<boolean>(false);
     const [isUploaded, setIsUploaded] = useState<boolean>(false);
 
-    const handleUpload = () => {
+    const handleUpload = async () => {
         if (!file) return;
-
-        const storageRef = ref(storage, `files/${file.name}`);
-        const uploadTask = uploadBytesResumable(storageRef, file);
         setIsUpload(true);
 
-        uploadTask.on(
-            'state_changed',
-            (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                setProgress(progress);
-            },
-            (error) => {
-                console.error(error);
-            },
-            () => {
-                getDownloadURL(uploadTask.snapshot.ref).then(() => {
-                    setIsUpload(false);
-                    setIsUploaded(true);
-                    onUploadSuccess();
-                });
-            }
-        );
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch('/api/drive', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) throw new Error('Upload failed');
+
+            setIsUpload(false);
+            setIsUploaded(true);
+            onUploadSuccess();
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            setIsUpload(false);
+        }
     };
 
     useEffect(() => {

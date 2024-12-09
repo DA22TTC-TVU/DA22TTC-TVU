@@ -1,23 +1,32 @@
 // components/FileList.tsx
 'use client'
-import React, { useEffect, useState, useRef } from 'react';
-import { storage, ref, listAll, getMetadata, getDownloadURL } from '../lib/firebase';
-import { FaFileDownload, FaSearch, FaFilter, FaFileAlt, FaFileWord, FaFileExcel, FaFilePowerpoint, FaFileImage, FaFile, FaFilePdf, FaSort } from "react-icons/fa";
+import React, { useEffect, useState } from 'react';
+import { FaFileDownload, FaSearch, FaFilter, FaFileWord, FaFileExcel, FaFilePowerpoint, FaFileImage, FaFile, FaFilePdf, FaSort } from "react-icons/fa";
 import { FaFileZipper } from "react-icons/fa6";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFloating, useInteractions, useClick, useRole, useDismiss, offset, flip, shift, autoUpdate } from '@floating-ui/react';
 
 interface FileData {
+    id: string;
     name: string;
-    fullPath: string;
-    createdAt: number;
-    updatedAt: number;
-    size: number;
+    mimeType: string;
+    size: string;
+    createdTime: string;
+    modifiedTime: string;
     type: string;
 }
 
 interface FileListProps {
     refresh: boolean;
+}
+
+interface DriveFile {
+    id?: string;
+    name?: string;
+    mimeType?: string;
+    size?: string;
+    createdTime?: string;
+    modifiedTime?: string;
 }
 
 const FileList: React.FC<FileListProps> = ({ refresh }) => {
@@ -30,8 +39,6 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [isSortOpen, setIsSortOpen] = useState(false);
-    const filterRef = useRef(null);
-    const sortRef = useRef(null);
 
     const filterFloating = useFloating({
         open: isFilterOpen,
@@ -71,37 +78,22 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
 
     useEffect(() => {
         const fetchFiles = async () => {
-            const listRef = ref(storage, 'files/');
-
             try {
-                const res = await listAll(listRef);
-                const filesData = await Promise.all(
-                    res.items.map(async (itemRef) => {
-                        const metadata = await getMetadata(itemRef);
-                        const createdAt = metadata.timeCreated
-                            ? new Date(metadata.timeCreated).getTime()
-                            : Date.now();
-                        const updatedAt = metadata.updated
-                            ? new Date(metadata.updated).getTime()
-                            : Date.now();
-                        const size = metadata.size || 0;
-                        const type = getFileType(metadata.name);
+                const response = await fetch('/api/drive');
+                const data = await response.json();
 
-                        return {
-                            name: metadata.name,
-                            fullPath: itemRef.fullPath,
-                            createdAt,
-                            updatedAt,
-                            size,
-                            type
-                        };
-                    })
-                );
+                const filesData = data.files?.map((file: DriveFile) => ({
+                    id: file.id || '',
+                    name: file.name || '',
+                    mimeType: file.mimeType || '',
+                    size: file.size || '0',
+                    createdTime: file.createdTime || '',
+                    modifiedTime: file.modifiedTime || '',
+                    type: getFileType(file.name || '')
+                })) || [];
 
-                const totalSize = filesData.reduce((acc, file) => acc + file.size, 0);
+                const totalSize = filesData.reduce((acc: number, file: FileData) => acc + parseInt(file.size), 0);
                 setTotalSize(totalSize);
-
-                filesData.sort((a, b) => b.updatedAt - a.updatedAt);
                 setFiles(filesData);
             } catch (error) {
                 console.error("Error fetching files:", error);
@@ -143,32 +135,35 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
         }
     };
 
-    const formatDateTime = (timestamp: number) => {
+    const formatDateTime = (timestamp: string) => {
         const date = new Date(timestamp);
         return isNaN(date.getTime()) ? 'Ngày không hợp lệ' : date.toLocaleString();
     };
 
-    const formatSize = (size: number) => {
-        if (size < 1024) return `${size} B`;
-        else if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
-        else if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(2)} MB`;
-        else return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    const formatSize = (size: string) => {
+        const numSize = parseInt(size);
+        if (numSize < 1024) return `${numSize} B`;
+        else if (numSize < 1024 * 1024) return `${(numSize / 1024).toFixed(2)} KB`;
+        else if (numSize < 1024 * 1024 * 1024) return `${(numSize / (1024 * 1024)).toFixed(2)} MB`;
+        else return `${(numSize / (1024 * 1024 * 1024)).toFixed(2)} GB`;
     };
 
-    const handleDownload = async (filePath: string) => {
-        setDownloadingFile(filePath);
+    const handleDownload = async (fileId: string, fileName: string) => {
+        setDownloadingFile(fileId);
         try {
-            const fileRef = ref(storage, filePath);
-            const url = await getDownloadURL(fileRef);
+            const response = await fetch(`/api/drive/download?fileId=${fileId}`);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = filePath.split('/').pop() || 'file';
+            link.download = fileName;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            setDownloadingFile(null);
+            window.URL.revokeObjectURL(url);
         } catch (error) {
             console.error("Error downloading file:", error);
+        } finally {
             setDownloadingFile(null);
         }
     };
@@ -189,11 +184,11 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
 
     const sortedFiles = filteredFiles.sort((a, b) => {
         if (sortCriteria === 'updatedAt') {
-            return sortOrder === 'asc' ? a.updatedAt - b.updatedAt : b.updatedAt - a.updatedAt;
+            return sortOrder === 'asc' ? a.modifiedTime.localeCompare(b.modifiedTime) : b.modifiedTime.localeCompare(a.modifiedTime);
         } else if (sortCriteria === 'name') {
             return sortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
         } else if (sortCriteria === 'size') {
-            return sortOrder === 'asc' ? a.size - b.size : b.size - a.size;
+            return sortOrder === 'asc' ? a.size.localeCompare(b.size) : b.size.localeCompare(a.size);
         } else {
             return sortOrder === 'asc' ? a.type.localeCompare(b.type) : b.type.localeCompare(a.type);
         }
@@ -339,13 +334,13 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
                                 transition={{ duration: 0.5, delay: 0.5 }}
                                 className='block sm:inline text-base sm:text-lg font-semibold text-indigo-600 mt-2 sm:mt-0 sm:ml-3 bg-indigo-100 px-2 py-1 rounded-full animate-pulse'
                             >
-                                {formatSize(totalSize)}
+                                {formatSize(totalSize.toString())}
                             </motion.span>
                         </motion.h2>
                         <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8'>
                             {sortedFiles.map((file, index) => (
                                 <motion.div
-                                    key={file.fullPath}
+                                    key={file.id}
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ duration: 0.5, delay: index * 0.1 }}
@@ -362,16 +357,16 @@ const FileList: React.FC<FileListProps> = ({ refresh }) => {
                                         </div>
                                     </div>
                                     <div className='p-4 sm:p-6'>
-                                        <p className='text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4'>{formatDateTime(file.updatedAt)}</p>
+                                        <p className='text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4'>{formatDateTime(file.modifiedTime)}</p>
                                         <motion.button
                                             whileHover={{ scale: 1.05 }}
                                             whileTap={{ scale: 0.95 }}
-                                            onClick={() => handleDownload(file.fullPath)}
+                                            onClick={() => handleDownload(file.id, file.name)}
                                             className='w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 transform focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center justify-center group'
-                                            disabled={downloadingFile === file.fullPath}
+                                            disabled={downloadingFile === file.id}
                                         >
                                             <FaFileDownload className='mr-2 sm:mr-3 group-hover:animate-bounce' />
-                                            {downloadingFile === file.fullPath ? 'Đang tải...' : 'Tải về'}
+                                            {downloadingFile === file.id ? 'Đang tải...' : 'Tải về'}
                                         </motion.button>
                                     </div>
                                 </motion.div>
