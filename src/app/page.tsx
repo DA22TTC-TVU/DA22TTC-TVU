@@ -200,11 +200,9 @@ export default function Home() {
     const files = event.target.files;
     if (!files) return;
 
-    // Xử lý từng file
     Array.from(files).forEach(async (file) => {
-      // Tạo temporary file item
       const tempFile: FileItem = {
-        id: `temp-${Date.now()}-${file.name}`, // Thêm tên file vào id để unique
+        id: `temp-${Date.now()}-${file.name}`,
         name: file.name,
         mimeType: file.type,
         size: file.size,
@@ -213,31 +211,63 @@ export default function Home() {
         uploadProgress: 0
       };
 
-      // Thêm file tạm vào danh sách
       setFiles(prev => sortFilesByType([...prev, tempFile]));
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('parentId', currentFolderId || '');
-
       try {
+        // Lấy signed URL
+        const urlResponse = await fetch('/api/drive/get-upload-url', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fileName: file.name,
+            mimeType: file.type,
+            parentId: currentFolderId
+          }),
+        });
+
+        const { uploadUrl } = await urlResponse.json();
+
+        // Upload trực tiếp lên Drive
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/drive/upload', true);
+        xhr.open('PUT', uploadUrl, true);
+        xhr.setRequestHeader('Content-Type', file.type);
 
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
             const progress = Math.round((event.loaded / event.total) * 100);
             setFiles(prev => prev.map(f =>
-              f.id === tempFile.id
-                ? { ...f, uploadProgress: progress }
-                : f
+              f.id === tempFile.id ? { ...f, uploadProgress: progress } : f
             ));
+
+            // Khi progress đạt 100%, đợi một chút rồi mới refresh
+            if (progress === 100) {
+              setTimeout(async () => {
+                const refreshResponse = await fetch(
+                  currentFolderId
+                    ? `/api/drive?folderId=${currentFolderId}`
+                    : '/api/drive',
+                  {
+                    headers: {
+                      'Cache-Control': 'no-cache, no-store, must-revalidate',
+                      'Pragma': 'no-cache',
+                      'Expires': '0'
+                    },
+                    cache: 'no-store'
+                  }
+                );
+                const refreshData = await refreshResponse.json();
+                setFiles(sortFilesByType(refreshData.files));
+              }, 1000); // Đợi 1 giây sau khi upload xong
+            }
           }
         };
 
         xhr.onload = async () => {
           if (xhr.status === 200) {
-            // Refresh lại danh sách file sau khi tất cả đã upload xong
+            // Xóa file tạm và refresh danh sách
+            setFiles(prev => prev.filter(f => f.id !== tempFile.id));
             const refreshResponse = await fetch(
               currentFolderId
                 ? `/api/drive?folderId=${currentFolderId}`
@@ -264,14 +294,14 @@ export default function Home() {
           setFiles(prev => prev.filter(f => f.id !== tempFile.id));
         };
 
-        xhr.send(formData);
+        xhr.send(file);
+
       } catch (error) {
         console.error(`Lỗi khi tải file ${file.name} lên:`, error);
         setFiles(prev => prev.filter(f => f.id !== tempFile.id));
       }
     });
 
-    // Reset input để có thể chọn lại cùng file
     event.target.value = '';
   };
 
