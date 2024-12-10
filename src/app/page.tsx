@@ -17,6 +17,8 @@ export default function Home() {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderHistory, setFolderHistory] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const formatBytes = (bytes: number) => {
     if (!bytes) return '0 Bytes';
@@ -207,6 +209,35 @@ export default function Home() {
     }
   };
 
+  const handleSearch = async (term: string) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/drive?q=${encodeURIComponent(term)}`);
+      const data = await response.json();
+      setFiles(sortFilesByType(data.files));
+    } catch (error) {
+      console.error('Lỗi khi tìm kiếm:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+
+    // Debounce search
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    const timeout = setTimeout(() => {
+      handleSearch(value);
+    }, 500);
+
+    setSearchTimeout(timeout);
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-[1800px] mx-auto">
@@ -217,6 +248,8 @@ export default function Home() {
             <div className="max-w-[720px] relative">
               <input 
                 type="text"
+                value={searchTerm}
+                onChange={handleSearchChange}
                 placeholder="Tìm kiếm tài liệu"
                 className="w-full px-12 py-3 bg-gray-100 rounded-lg outline-none hover:bg-gray-200 focus:bg-white focus:shadow-md transition-all"
               />
@@ -307,6 +340,14 @@ export default function Home() {
                     </div>
                   </div>
                 ))
+              ) : files.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                  <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="text-lg">Thư mục trống</p>
+                  <p className="text-sm mt-2">Chưa có tệp tin hoặc thư mục nào</p>
+                </div>
               ) : (
                 files.map(file => (
                   <div

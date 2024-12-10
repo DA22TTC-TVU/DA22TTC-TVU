@@ -11,15 +11,25 @@ const drive = google.drive({ version: 'v3', auth });
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
-        const folderId = searchParams.get('folderId') || '1YAMjIdiDdhc5cjR7etXIpNoPW26TV1Yf';
+        const folderId = searchParams.get('folderId');
+        const searchTerm = searchParams.get('q');
 
-        const query = folderId
-            ? `'${folderId}' in parents`
-            : "mimeType='application/vnd.google-apps.folder'";
+        let query = '';
+
+        if (searchTerm) {
+            // Tìm kiếm trong toàn bộ Drive với điều kiện không phải là file trong thùng rác
+            query = `name contains '${searchTerm}' and trashed = false`;
+        } else if (folderId) {
+            // Nếu không có từ khóa tìm kiếm, hiển thị nội dung thư mục hiện tại
+            query = `'${folderId}' in parents and trashed = false`;
+        } else {
+            // Hiển thị thư mục gốc
+            query = `'1YAMjIdiDdhc5cjR7etXIpNoPW26TV1Yf' in parents and trashed = false`;
+        }
 
         const response = await drive.files.list({
             q: query,
-            fields: 'files(id, name, mimeType, size, createdTime, modifiedTime)',
+            fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, parents)',
             orderBy: 'modifiedTime desc',
             pageSize: 1000
         } as drive_v3.Params$Resource$Files$List);
