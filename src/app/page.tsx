@@ -98,6 +98,7 @@ export default function Home() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
           },
           body: JSON.stringify({
             name: folderName,
@@ -109,7 +110,14 @@ export default function Home() {
           alert('Lỗi khi tạo thư mục');
         } else {
           alert('Tạo thư mục thành công');
-          handleDriveClick(); // Refresh the file list
+          const refreshResponse = await fetch('/api/drive', {
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
+          const refreshData = await refreshResponse.json();
+          setFiles(refreshData.files);
         }
       } catch (error) {
         console.error('Lỗi khi tạo thư mục:', error);
@@ -127,6 +135,9 @@ export default function Home() {
       try {
         const response = await fetch('/api/drive/upload', {
           method: 'POST',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
           body: formData,
         });
         const data = await response.json();
@@ -134,7 +145,14 @@ export default function Home() {
           alert('Lỗi khi tải file lên');
         } else {
           alert('Tải file lên thành công');
-          handleDriveClick(); // Refresh the file list
+          const refreshResponse = await fetch('/api/drive', {
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
+          const refreshData = await refreshResponse.json();
+          setFiles(refreshData.files);
         }
       } catch (error) {
         console.error('Lỗi khi tải file lên:', error);

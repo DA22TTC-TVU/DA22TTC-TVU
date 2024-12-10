@@ -31,7 +31,9 @@ export async function GET(request: Request) {
             totalFiles
         }, {
             headers: {
-                'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300'
+                'Cache-Control': 'no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
             }
         });
     } catch (error) {
