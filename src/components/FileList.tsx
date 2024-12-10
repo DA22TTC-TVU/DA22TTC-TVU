@@ -107,7 +107,8 @@ export default function FileList({
                     sortedFiles.map(file => (
                         <div
                             key={file.id}
-                            className={`flex items-center px-4 py-2 hover:bg-gray-100 rounded-lg cursor-pointer group ${isGridView ? 'flex-row' : ''}`}
+                            className={`flex items-center px-4 py-2 hover:bg-gray-100 rounded-lg cursor-pointer group ${isGridView ? 'flex-row' : ''
+                                } ${file.isUploading ? 'opacity-80 pointer-events-none' : ''}`}
                             onClick={() => file.mimeType === 'application/vnd.google-apps.folder' ? onFolderClick(file.id) : null}
                         >
                             <div className={`flex items-center ${isGridView ? 'flex-1 min-w-0' : 'flex-1 min-w-0'}`}>
@@ -138,7 +139,32 @@ export default function FileList({
                                 </div>
                             </div>
 
-                            {file.mimeType !== 'application/vnd.google-apps.folder' && (
+                            {file.isUploading && (
+                                <div className="ml-4 w-32">
+                                    <div className="w-full h-3 bg-gray-100 rounded-full border border-gray-200 my-2">
+                                        <div
+                                            className="h-full bg-blue-500 rounded-full"
+                                            style={{
+                                                width: `${file.uploadProgress || 0}%`,
+                                                transition: 'width 0.3s ease'
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="text-xs font-medium text-gray-600 text-right">
+                                        {file.uploadProgress}%
+                                    </div>
+                                </div>
+                            )}
+
+                            {file.isUploading && (
+                                <div className="ml-3 mr-2 flex items-center text-gray-500">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                    </svg>
+                                </div>
+                            )}
+
+                            {file.mimeType !== 'application/vnd.google-apps.folder' && !file.isUploading && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();

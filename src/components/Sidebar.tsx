@@ -9,9 +9,14 @@ interface SidebarProps {
     formatBytes: (bytes: number) => string;
     isOpen: boolean;
     onClose: () => void;
+    fileInputRef: React.RefObject<HTMLInputElement>;
 }
 
-export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, formatBytes, isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, formatBytes, isOpen, onClose, fileInputRef }: SidebarProps) {
+    const handleUploadClick = () => {
+        fileInputRef.current?.click();
+    };
+
     return (
         <>
             {isOpen && (
@@ -38,12 +43,6 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, forma
                 </button>
 
                 <div className="relative mb-4">
-                    <input
-                        type="file"
-                        onChange={onUploadFile}
-                        className="hidden"
-                        id="fileInput"
-                    />
                     <label
                         htmlFor="fileInput"
                         className="flex items-center space-x-2 px-6 py-3 rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer bg-white"
@@ -53,6 +52,14 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, forma
                         </svg>
                         <span>Tải File Lên</span>
                     </label>
+                    <input
+                        id="fileInput"
+                        type="file"
+                        multiple
+                        onChange={onUploadFile}
+                        className="hidden"
+                        ref={fileInputRef}
+                    />
                 </div>
 
                 <div className="space-y-1">

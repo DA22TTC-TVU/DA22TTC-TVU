@@ -10,4 +10,6 @@ export interface FileItem {
     mimeType: string;
     createdTime: string;
     size: number;
+    isUploading?: boolean;
+    uploadProgress?: number;
 } 
