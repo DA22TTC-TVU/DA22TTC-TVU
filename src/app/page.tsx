@@ -303,7 +303,7 @@ export default function Home() {
                   <div
                     key={file.id}
                     className="flex items-center px-4 py-2 hover:bg-gray-100 rounded-lg cursor-pointer group"
-                    onDoubleClick={() => file.mimeType === 'application/vnd.google-apps.folder' ? handleFolderClick(file.id) : null}
+                    onClick={() => file.mimeType === 'application/vnd.google-apps.folder' ? handleFolderClick(file.id) : null}
                   >
                     <div className="flex items-center flex-1">
                       {file.mimeType === 'application/vnd.google-apps.folder' ? (
