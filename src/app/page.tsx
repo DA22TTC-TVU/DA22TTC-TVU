@@ -259,7 +259,7 @@ export default function Home() {
                 );
                 const refreshData = await refreshResponse.json();
                 setFiles(sortFilesByType(refreshData.files));
-              }, 1000); // Đợi 1 giây sau khi upload xong
+              }, 2500); // Đợi 1 giây sau khi upload xong
             }
           }
         };
