@@ -1,6 +1,8 @@
 // pages/index.js
 'use client'
 import React, { useState, useEffect } from 'react';
+import Skeleton from 'react-loading-skeleton'
+import 'react-loading-skeleton/dist/skeleton.css'
 
 interface DriveInfo {
   total: number;
@@ -14,6 +16,7 @@ export default function Home() {
   const [driveInfo, setDriveInfo] = useState<DriveInfo | null>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderHistory, setFolderHistory] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const formatBytes = (bytes: number) => {
     if (!bytes) return '0 Bytes';
@@ -58,10 +61,17 @@ export default function Home() {
       setFolderHistory([...folderHistory, currentFolderId]);
     }
     setCurrentFolderId(folderId);
-    const response = await fetch(`/api/drive?folderId=${folderId}`);
-    const data = await response.json();
-    setFiles(sortFilesByType(data.files));
-    setShowFiles(true);
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/drive?folderId=${folderId}`);
+      const data = await response.json();
+      setFiles(sortFilesByType(data.files));
+      setShowFiles(true);
+    } catch (error) {
+      console.error('Lỗi:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBackClick = async () => {
@@ -189,111 +199,143 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className='mx-auto py-8'>
-        <h1 className='font-extrabold text-4xl mb-4 text-center text-gray-900'>
-          DA22TTC-TVU
-        </h1>
-        <p className='text-center text-gray-700 mb-6'>
-          Trang web chia sẽ file cấp tốc không đăng nhập cho sinh viên lớp DA22TTC của TVU.
-        </p>
-
-        <div className="flex">
-          <div className="w-64 bg-white p-4 rounded-lg shadow-lg ml-0">
-            {showFiles && (
-              <>
-                <button onClick={handleCreateFolder} className="mb-2 p-2 bg-blue-500 text-white rounded">
-                  Tạo thư mục
-                </button>
-                <input type="file" onChange={handleUploadFile} className="mb-2" />
-              </>
-            )}
-            <div
-              className="cursor-pointer hover:bg-gray-100 p-4 rounded-lg transition-all"
-              onDoubleClick={handleDriveClick}
-            >
-              <div className="flex items-center space-x-3">
-                <svg
-                  className="w-10 h-10 text-blue-600"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z" />
-                  <path d="M7 7h10v2H7zM7 11h10v2H7zM7 15h7v2H7z" />
-                </svg>
-                <div>
-                  <div className="font-medium">DA22TTC</div>
-                  {driveInfo && (
-                    <div className="text-sm text-gray-600">
-                      {formatBytes(driveInfo.remaining)} còn trống
-                    </div>
-                  )}
-                </div>
-              </div>
+    <div className="min-h-screen bg-white">
+      <div className="max-w-[1800px] mx-auto">
+        {/* Header */}
+        <div className="flex items-center p-4 border-b">
+          <h1 className="text-2xl font-medium text-gray-800">DA22TTC-TVU</h1>
+          <div className="flex-1 mx-8">
+            <div className="max-w-[720px] relative">
+              <input 
+                type="text"
+                placeholder="Tìm kiếm tài liệu"
+                className="w-full px-12 py-3 bg-gray-100 rounded-lg outline-none hover:bg-gray-200 focus:bg-white focus:shadow-md transition-all"
+              />
+              <svg className="w-5 h-5 text-gray-500 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
             </div>
           </div>
+        </div>
 
-          {showFiles && (
-            <div className="bg-white rounded-lg shadow-lg p-6 flex-1 ml-4">
-              <div className="flex items-center mb-4">
-                {currentFolderId && (
-                  <button
-                    className="p-2 rounded-full hover:bg-gray-100 transition-all"
-                    onClick={handleBackClick}
-                  >
-                    <svg 
-                      className="w-6 h-6 text-gray-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 19l-7-7 7-7"
-                      />
-                    </svg>
-                  </button>
-                )}
+        {/* Main Content */}
+        <div className="flex">
+          {/* Sidebar */}
+          <div className="w-60 p-3">
+            <button 
+              onClick={handleCreateFolder}
+              className="flex items-center space-x-2 px-6 py-3 rounded-full shadow-md hover:shadow-lg transition-all mb-4"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Mới</span>
+            </button>
+
+            <div className="relative mb-4">
+              <input
+                type="file"
+                onChange={handleUploadFile}
+                className="hidden"
+                id="fileInput"
+              />
+              <label 
+                htmlFor="fileInput"
+                className="flex items-center space-x-2 px-6 py-3 rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer bg-white"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                <span>Tải lên</span>
+              </label>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center space-x-3 px-4 py-2 rounded-full hover:bg-gray-100 cursor-pointer text-gray-700">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                <span>DA22TTC</span>
               </div>
-              
-              <div className="grid gap-2">
-                {files.map(file => (
+            </div>
+
+            {driveInfo && (
+              <div className="mt-8 px-4 text-sm text-gray-500">
+                <div className="mb-2">Bộ nhớ đã dùng</div>
+                <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-500 rounded-full"
+                    style={{ width: `${(driveInfo.used / driveInfo.total) * 100}%` }}
+                  />
+                </div>
+                <div className="mt-2">{formatBytes(driveInfo.remaining)} còn trống</div>
+              </div>
+            )}
+          </div>
+
+          {/* Files List */}
+          <div className="flex-1 p-6">
+            {currentFolderId && (
+              <button
+                onClick={handleBackClick}
+                className="mb-4 flex items-center space-x-2 text-gray-600 hover:bg-gray-100 rounded-full p-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                <span>Quay lại</span>
+              </button>
+            )}
+
+            <div className="grid grid-cols-1 gap-2">
+              {isLoading ? (
+                // Hiển thị 5 skeleton items khi đang loading
+                [...Array(5)].map((_, index) => (
+                  <div key={index} className="flex items-center px-4 py-2 rounded-lg">
+                    <div className="flex items-center flex-1">
+                      <Skeleton circle width={24} height={24} className="mr-3"/>
+                      <Skeleton width={200} height={20}/>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                files.map(file => (
                   <div
                     key={file.id}
-                    className="hover:bg-gray-100 p-3 rounded cursor-pointer flex justify-between items-center"
+                    className="flex items-center px-4 py-2 hover:bg-gray-100 rounded-lg cursor-pointer group"
                     onDoubleClick={() => file.mimeType === 'application/vnd.google-apps.folder' ? handleFolderClick(file.id) : null}
                   >
-                    <span className="text-gray-800">{file.name}</span>
+                    <div className="flex items-center flex-1">
+                      {file.mimeType === 'application/vnd.google-apps.folder' ? (
+                        <svg className="w-6 h-6 text-gray-500 mr-3" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/>
+                        </svg>
+                      ) : (
+                        <svg className="w-6 h-6 text-gray-500 mr-3" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                        </svg>
+                      )}
+                      <span className="text-gray-700">{file.name}</span>
+                    </div>
+                    
                     {file.mimeType !== 'application/vnd.google-apps.folder' && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDownload(file.id, file.name);
                         }}
-                        className="p-2 hover:bg-gray-200 rounded-full"
+                        className="opacity-0 group-hover:opacity-100 p-2 hover:bg-gray-200 rounded-full"
                       >
-                        <svg 
-                          className="w-5 h-5 text-gray-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                          />
+                        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
                       </button>
                     )}
                   </div>
-                ))}
-              </div>
+                ))
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
