@@ -28,6 +28,7 @@ export default function Home() {
 
   useEffect(() => {
     const fetchDriveInfo = async () => {
+      setIsLoading(true);
       try {
         const driveResponse = await fetch('/api/drive/info');
         const driveData = await driveResponse.json();
@@ -40,6 +41,8 @@ export default function Home() {
       } catch (error) {
         console.error('Lỗi khi lấy danh sách thư mục:', error);
         setFiles([]);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchDriveInfo();
@@ -80,6 +83,7 @@ export default function Home() {
       const previousFolderId = newHistory.pop();
       setFolderHistory(newHistory);
       
+      setIsLoading(true);
       try {
         const response = await fetch(`/api/drive${previousFolderId ? `?folderId=${previousFolderId}` : ''}`);
         const data = await response.json();
@@ -87,8 +91,11 @@ export default function Home() {
         setCurrentFolderId(previousFolderId || null);
       } catch (error) {
         console.error('Lỗi khi quay lại thư mục:', error);
+      } finally {
+        setIsLoading(false);
       }
     } else {
+      setIsLoading(true);
       try {
         const response = await fetch('/api/drive');
         const data = await response.json();
@@ -96,6 +103,8 @@ export default function Home() {
         setCurrentFolderId(null);
       } catch (error) {
         console.error('Lỗi khi quay về thư mục gốc:', error);
+      } finally {
+        setIsLoading(false);
       }
     }
   };
