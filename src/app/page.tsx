@@ -259,30 +259,32 @@ export default function Home() {
                 );
                 const refreshData = await refreshResponse.json();
                 setFiles(sortFilesByType(refreshData.files));
-              }, 2500); // Đợi 1 giây sau khi upload xong
+              }, 2500);
             }
           }
         };
 
         xhr.onload = async () => {
           if (xhr.status === 200) {
-            // Xóa file tạm và refresh danh sách
-            setFiles(prev => prev.filter(f => f.id !== tempFile.id));
-            const refreshResponse = await fetch(
-              currentFolderId
-                ? `/api/drive?folderId=${currentFolderId}`
-                : '/api/drive',
-              {
-                headers: {
-                  'Cache-Control': 'no-cache, no-store, must-revalidate',
-                  'Pragma': 'no-cache',
-                  'Expires': '0'
-                },
-                cache: 'no-store'
-              }
-            );
-            const refreshData = await refreshResponse.json();
-            setFiles(sortFilesByType(refreshData.files));
+            // Xóa file tạm và refresh danh sách sau 2500ms
+            setTimeout(async () => {
+              setFiles(prev => prev.filter(f => f.id !== tempFile.id));
+              const refreshResponse = await fetch(
+                currentFolderId
+                  ? `/api/drive?folderId=${currentFolderId}`
+                  : '/api/drive',
+                {
+                  headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                  },
+                  cache: 'no-store'
+                }
+              );
+              const refreshData = await refreshResponse.json();
+              setFiles(sortFilesByType(refreshData.files));
+            }, 2500);
           } else {
             alert(`Lỗi khi tải file ${file.name} lên`);
             setFiles(prev => prev.filter(f => f.id !== tempFile.id));
