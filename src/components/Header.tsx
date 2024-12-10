@@ -1,5 +1,6 @@
 'use client'
 import React from 'react';
+import { useRouter } from 'next/navigation';
 
 interface HeaderProps {
     searchTerm: string;
@@ -7,6 +8,8 @@ interface HeaderProps {
 }
 
 export default function Header({ searchTerm, onSearchChange }: HeaderProps) {
+    const router = useRouter();
+
     return (
         <div className="flex flex-col md:flex-row items-center p-4 border-b">
             <h1 className="text-2xl font-medium text-gray-800 mb-4 md:mb-0">DA22TTC-TVU</h1>
@@ -24,6 +27,12 @@ export default function Header({ searchTerm, onSearchChange }: HeaderProps) {
                     </svg>
                 </div>
             </div>
+            <button
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-all mt-4 md:mt-0"
+                onClick={() => router.push('/txt')}
+            >
+                Ghi chú
+            </button>
         </div>
     );
 } 
