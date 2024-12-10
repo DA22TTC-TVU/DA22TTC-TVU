@@ -31,7 +31,7 @@ export async function GET(request: Request) {
         }
 
         // Trả về URL tải xuống trực tiếp
-        return NextResponse.json({ 
+        return NextResponse.json({
             downloadUrl: file.data.webContentLink,
             fileName: file.data.name
         });

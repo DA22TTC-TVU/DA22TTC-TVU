@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 
         // Tạo cache key dựa trên tham số
         const cacheKey = `drive_files:${folderId || 'root'}_${searchTerm || ''}`;
-        
+
         // Kiểm tra cache
         const cachedData = await redis.get(cacheKey);
         if (cachedData) {

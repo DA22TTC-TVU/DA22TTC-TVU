@@ -25,10 +25,10 @@ export async function POST(request: Request) {
         });
 
         // Xác định key chính xác của thư mục cha
-        const parentKey = parentId 
+        const parentKey = parentId
             ? `drive_files:${parentId}_`
             : 'drive_files:root_';
-            
+
         // Xóa cache
         const deleteResult = await redis.del(parentKey);
 
