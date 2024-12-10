@@ -8,7 +8,10 @@ interface FileListProps {
     files: FileItem[];
     isLoading: boolean;
     currentFolderId: string | null;
+    currentFolderName?: string;
+    folderPath?: { id: string; name: string }[];
     onFolderClick: (folderId: string) => void;
+    onBreadcrumbClick: (folderId: string, index: number) => void;
     onBackClick: () => void;
     onDownload: (fileId: string, fileName: string) => void;
 }
@@ -35,7 +38,10 @@ export default function FileList({
     files,
     isLoading,
     currentFolderId,
+    currentFolderName,
+    folderPath = [],
     onFolderClick,
+    onBreadcrumbClick,
     onBackClick,
     onDownload
 }: FileListProps) {
@@ -55,33 +61,62 @@ export default function FileList({
 
     return (
         <div className="flex-1 p-3 md:p-6 flex flex-col h-[calc(100vh-88px)]">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col mb-4">
                 {currentFolderId && (
-                    <button
-                        onClick={onBackClick}
-                        className="inline-flex items-center px-2 md:px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-full p-2 w-fit"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                        <span className="hidden md:inline">Quay lại</span>
-                    </button>
-                )}
-                {!isLoading && (
-                    <button
-                        onClick={() => setIsGridView(!isGridView)}
-                        className="hidden md:inline-flex items-center px-2 md:px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-full p-2 w-fit"
-                    >
-                        {isGridView ? (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                            </svg>
-                        ) : (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
-                            </svg>
-                        )}
-                    </button>
+                    <>
+                        <div className="flex items-center space-x-2 text-sm text-gray-600 mb-2">
+                            <span
+                                className="hover:text-blue-600 cursor-pointer"
+                                onClick={() => onBackClick()}
+                            >
+                                DA22TTC
+                            </span>
+                            {folderPath.map((folder, index) => (
+                                <React.Fragment key={folder.id}>
+                                    <span className="text-gray-400">/</span>
+                                    <span
+                                        className="hover:text-blue-600 cursor-pointer"
+                                        onClick={() => onBreadcrumbClick(folder.id, index)}
+                                    >
+                                        {folder.name}
+                                    </span>
+                                </React.Fragment>
+                            ))}
+                            {currentFolderName && (
+                                <>
+                                    <span className="text-gray-400">/</span>
+                                    <span className="text-gray-800">{currentFolderName}</span>
+                                </>
+                            )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <button
+                                onClick={onBackClick}
+                                className="inline-flex items-center px-2 md:px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-full p-2 w-fit"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                                <span className="hidden md:inline">Quay lại</span>
+                            </button>
+                            {!isLoading && (
+                                <button
+                                    onClick={() => setIsGridView(!isGridView)}
+                                    className="hidden md:inline-flex items-center px-2 md:px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-full p-2 w-fit"
+                                >
+                                    {isGridView ? (
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
+                                        </svg>
+                                    )}
+                                </button>
+                            )}
+                        </div>
+                    </>
                 )}
             </div>
 
@@ -170,7 +205,7 @@ export default function FileList({
                                         e.stopPropagation();
                                         onDownload(file.id, file.name);
                                     }}
-                                    className={`opacity-0 group-hover:opacity-100 p-2 hover:bg-gray-200 rounded-full ml-auto`}
+                                    className={`md:opacity-0 md:group-hover:opacity-100 p-2 hover:bg-gray-200 rounded-full ml-auto`}
                                 >
                                     <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

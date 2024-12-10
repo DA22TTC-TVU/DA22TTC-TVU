@@ -4,6 +4,12 @@ import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import FileList from '../components/FileList';
 import { DriveInfo, FileItem } from '../types';
+import { Dialog } from '@headlessui/react'
+
+interface FolderBreadcrumb {
+  id: string;
+  name: string;
+}
 
 export default function Home() {
   const [showFiles, setShowFiles] = useState<boolean>(false);
@@ -15,6 +21,11 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [currentFolderName, setCurrentFolderName] = useState<string>('');
+  const [folderPath, setFolderPath] = useState<FolderBreadcrumb[]>([]);
 
   const formatBytes = (bytes: number) => {
     if (!bytes) return '0 Bytes';
@@ -57,12 +68,19 @@ export default function Home() {
     });
   };
 
-  const handleFolderClick = async (folderId: string) => {
+  const handleFolderClick = async (folderId: string, folderName?: string) => {
     if (currentFolderId) {
       setFolderHistory([...folderHistory, currentFolderId]);
+      setFolderPath([...folderPath, { id: currentFolderId, name: currentFolderName }]);
+    } else {
+      setFolderHistory([]);
+      setFolderPath([]);
     }
+
     setCurrentFolderId(folderId);
+    setCurrentFolderName(folderName || '');
     setIsLoading(true);
+
     try {
       const response = await fetch(`/api/drive?folderId=${folderId}`);
       const data = await response.json();
@@ -79,14 +97,20 @@ export default function Home() {
     if (folderHistory.length > 0) {
       const newHistory = [...folderHistory];
       const previousFolderId = newHistory.pop();
+
+      const newPath = [...folderPath];
+      const previousFolder = newPath.pop();
+
       setFolderHistory(newHistory);
+      setFolderPath(newPath);
+      setCurrentFolderId(previousFolderId || null);
+      setCurrentFolderName(previousFolder?.name || '');
 
       setIsLoading(true);
       try {
         const response = await fetch(`/api/drive${previousFolderId ? `?folderId=${previousFolderId}` : ''}`);
         const data = await response.json();
         setFiles(sortFilesByType(data.files));
-        setCurrentFolderId(previousFolderId || null);
       } catch (error) {
         console.error('Lỗi khi quay lại thư mục:', error);
       } finally {
@@ -99,6 +123,9 @@ export default function Home() {
         const data = await response.json();
         setFiles(sortFilesByType(data.files));
         setCurrentFolderId(null);
+        setCurrentFolderName('');
+        setFolderPath([]);
+        setFolderHistory([]);
       } catch (error) {
         console.error('Lỗi khi quay về thư mục gốc:', error);
       } finally {
@@ -115,47 +142,45 @@ export default function Home() {
     setFiles(data.files);
   };
 
-  const handleCreateFolder = async () => {
-    const folderName = prompt('Nhập tên thư mục mới:');
-    if (folderName) {
-      try {
-        const response = await fetch('/api/drive/create-folder', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-          },
-          body: JSON.stringify({
-            name: folderName,
-            parentId: currentFolderId,
-          }),
-        });
-        const data = await response.json();
-        if (data.error) {
-          alert('Lỗi khi tạo thư mục');
-        } else {
-          alert('Tạo thư mục thành công');
+  const handleCreateFolder = () => {
+    setIsCreateFolderModalOpen(true);
+  };
 
-          // Đảm bảo fetch mới nhất từ drive
-          const refreshResponse = await fetch(
-            currentFolderId
-              ? `/api/drive?folderId=${currentFolderId}`
-              : '/api/drive',
-            {
-              headers: {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
-              },
-              cache: 'no-store'
-            }
-          );
-          const refreshData = await refreshResponse.json();
-          setFiles(sortFilesByType(refreshData.files));
+  const handleCreateFolderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFolderName.trim()) return;
+
+    setIsCreatingFolder(true);
+    try {
+      const response = await fetch('/api/drive/create-folder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+        body: JSON.stringify({
+          name: newFolderName,
+          parentId: currentFolderId,
+        }),
+      });
+      const data = await response.json();
+
+      if (data.error) {
+        alert('Lỗi khi tạo thư mục');
+      } else {
+        // Đóng modal và reset form
+        setIsCreateFolderModalOpen(false);
+        setNewFolderName('');
+
+        // Tự động vào thư mục mới tạo
+        if (data.id) {
+          handleFolderClick(data.id);
         }
-      } catch (error) {
-        console.error('Lỗi khi tạo thư mục:', error);
       }
+    } catch (error) {
+      console.error('Lỗi khi tạo thư mục:', error);
+    } finally {
+      setIsCreatingFolder(false);
     }
   };
 
@@ -287,6 +312,31 @@ export default function Home() {
     setSearchTimeout(timeout);
   };
 
+  const handleBreadcrumbClick = async (folderId: string, index: number) => {
+    // Cắt folderPath và folderHistory tới vị trí được click
+    const newPath = folderPath.slice(0, index);
+    const newHistory = folderHistory.slice(0, index);
+
+    setFolderPath(newPath);
+    setFolderHistory(newHistory);
+    setCurrentFolderId(folderId);
+
+    // Lấy tên thư mục từ folderPath
+    const folder = folderPath[index];
+    setCurrentFolderName(folder?.name || '');
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/drive?folderId=${folderId}`);
+      const data = await response.json();
+      setFiles(sortFilesByType(data.files));
+    } catch (error) {
+      console.error('Lỗi khi điều hướng qua breadcrumb:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-[1800px] mx-auto">
@@ -321,12 +371,63 @@ export default function Home() {
             files={files}
             isLoading={isLoading}
             currentFolderId={currentFolderId}
-            onFolderClick={handleFolderClick}
+            currentFolderName={currentFolderName}
+            folderPath={folderPath}
+            onFolderClick={(id) => {
+              const folder = files.find(f => f.id === id);
+              handleFolderClick(id, folder?.name);
+            }}
+            onBreadcrumbClick={handleBreadcrumbClick}
             onBackClick={handleBackClick}
             onDownload={handleDownload}
           />
         </div>
       </div>
+
+      <Dialog
+        open={isCreateFolderModalOpen}
+        onClose={() => !isCreatingFolder && setIsCreateFolderModalOpen(false)}
+        className="relative z-50"
+      >
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="mx-auto max-w-sm rounded-lg bg-white p-6 shadow-xl">
+            <Dialog.Title className="text-lg font-medium mb-4">
+              Tạo thư mục mới
+            </Dialog.Title>
+
+            <form onSubmit={handleCreateFolderSubmit}>
+              <input
+                type="text"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="Nhập tên thư mục"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isCreatingFolder}
+              />
+
+              <div className="mt-4 flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => !isCreatingFolder && setIsCreateFolderModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                  disabled={isCreatingFolder}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 disabled:opacity-50"
+                  disabled={isCreatingFolder || !newFolderName.trim()}
+                >
+                  {isCreatingFolder ? 'Đang tạo...' : 'Tạo thư mục'}
+                </button>
+              </div>
+            </form>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
     </div>
   );
 }

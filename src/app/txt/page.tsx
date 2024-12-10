@@ -4,13 +4,15 @@ import { ref, onValue, push, set, remove } from 'firebase/database';
 import { getDatabaseInstance } from '../../lib/firebaseConfig';
 import TextareaAutosize from 'react-textarea-autosize';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCopy, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faCopy, faTrash, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/atom-one-dark.css';
 import Skeleton from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
+import { useRouter } from 'next/navigation';
 
 const NotePage = () => {
+    const router = useRouter();
     const [notes, setNotes] = useState<{ id: string; content: any; timestamp: number }[]>([]);
     const [newNote, setNewNote] = useState('');
     const [loading, setLoading] = useState(true);
@@ -79,8 +81,20 @@ const NotePage = () => {
         alert('Đã sao chép ghi chú!');
     };
 
+    const handleGoBack = () => {
+        router.push('/');
+    };
+
     return (
         <div className="p-4">
+            <button
+                onClick={handleGoBack}
+                className="mb-4 text-gray-600 hover:text-gray-800 flex items-center gap-2"
+            >
+                <FontAwesomeIcon icon={faArrowLeft} size="lg" />
+                <span>Quay lại trang chủ</span>
+            </button>
+
             <h1 className="text-2xl font-bold mb-4">Ghi chú</h1>
             <div className="flex flex-col gap-2 mb-4">
                 <TextareaAutosize
