@@ -12,6 +12,8 @@ const drive = google.drive({ version: 'v3', auth });
 
 export async function POST(request: Request) {
     try {
+        const origin = request.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? '*';
+
         const { fileName, mimeType, parentId } = await request.json();
 
         // Xóa cache của thư mục cha
@@ -36,7 +38,7 @@ export async function POST(request: Request) {
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
-                'Origin': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+                'Origin': origin
             },
             body: JSON.stringify(fileMetadata)
         });
@@ -48,13 +50,27 @@ export async function POST(request: Request) {
 
         return new NextResponse(JSON.stringify({ uploadUrl }), {
             headers: {
-                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Origin': origin,
                 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+                'Access-Control-Allow-Credentials': 'true',
             }
         });
     } catch (error) {
         console.error('Error getting upload URL:', error);
         return NextResponse.json({ error: 'Lỗi khi tạo URL upload' }, { status: 500 });
     }
+}
+
+export async function OPTIONS(request: Request) {
+    const origin = request.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? '*';
+
+    return new NextResponse(null, {
+        headers: {
+            'Access-Control-Allow-Origin': origin,
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            'Access-Control-Allow-Credentials': 'true',
+        },
+    });
 }
