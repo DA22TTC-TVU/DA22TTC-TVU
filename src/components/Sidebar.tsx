@@ -34,7 +34,7 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, forma
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    <span>Mới</span>
+                    <span>Tạo Thư Mục</span>
                 </button>
 
                 <div className="relative mb-4">
@@ -51,7 +51,7 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, forma
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                         </svg>
-                        <span>Tải lên</span>
+                        <span>Tải File Lên</span>
                     </label>
                 </div>
 
