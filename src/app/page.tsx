@@ -26,23 +26,32 @@ export default function Home() {
   useEffect(() => {
     const fetchDriveInfo = async () => {
       try {
-        // Lấy thông tin drive
         const driveResponse = await fetch('/api/drive/info');
         const driveData = await driveResponse.json();
         setDriveInfo(driveData);
 
-        // Lấy danh sách files
         const filesResponse = await fetch('/api/drive');
         const filesData = await filesResponse.json();
-        console.log('Danh sách thư mục:', filesData.files);
-        setFiles(filesData.files || []); // Đảm bảo luôn có một mảng, ngay cả khi trống
+        const sortedFiles = sortFilesByType(filesData.files || []);
+        setFiles(sortedFiles);
       } catch (error) {
         console.error('Lỗi khi lấy danh sách thư mục:', error);
-        setFiles([]); // Đặt mảng rỗng nếu có lỗi
+        setFiles([]);
       }
     };
     fetchDriveInfo();
   }, []);
+
+  const sortFilesByType = (files: any[]) => {
+    return [...files].sort((a, b) => {
+      const isAFolder = a.mimeType === 'application/vnd.google-apps.folder';
+      const isBFolder = b.mimeType === 'application/vnd.google-apps.folder';
+      
+      if (isAFolder && !isBFolder) return -1;
+      if (!isAFolder && isBFolder) return 1;
+      return 0;
+    });
+  };
 
   const handleFolderClick = async (folderId: string) => {
     if (currentFolderId) {
@@ -51,7 +60,7 @@ export default function Home() {
     setCurrentFolderId(folderId);
     const response = await fetch(`/api/drive?folderId=${folderId}`);
     const data = await response.json();
-    setFiles(data.files);
+    setFiles(sortFilesByType(data.files));
     setShowFiles(true);
   };
 
@@ -64,17 +73,16 @@ export default function Home() {
       try {
         const response = await fetch(`/api/drive${previousFolderId ? `?folderId=${previousFolderId}` : ''}`);
         const data = await response.json();
-        setFiles(data.files);
+        setFiles(sortFilesByType(data.files));
         setCurrentFolderId(previousFolderId || null);
       } catch (error) {
         console.error('Lỗi khi quay lại thư mục:', error);
       }
     } else {
-      // Nếu không còn lịch sử, quay về thư mục gốc
       try {
         const response = await fetch('/api/drive');
         const data = await response.json();
-        setFiles(data.files);
+        setFiles(sortFilesByType(data.files));
         setCurrentFolderId(null);
       } catch (error) {
         console.error('Lỗi khi quay về thư mục gốc:', error);
@@ -117,7 +125,7 @@ export default function Home() {
             }
           });
           const refreshData = await refreshResponse.json();
-          setFiles(refreshData.files);
+          setFiles(sortFilesByType(refreshData.files));
         }
       } catch (error) {
         console.error('Lỗi khi tạo thư mục:', error);
@@ -152,7 +160,7 @@ export default function Home() {
             }
           });
           const refreshData = await refreshResponse.json();
-          setFiles(refreshData.files);
+          setFiles(sortFilesByType(refreshData.files));
         }
       } catch (error) {
         console.error('Lỗi khi tải file lên:', error);
