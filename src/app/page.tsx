@@ -122,35 +122,44 @@ export default function Home() {
   const handleCreateFolder = async () => {
     const folderName = prompt('Nhập tên thư mục mới:');
     if (folderName) {
-      try {
-        const response = await fetch('/api/drive/create-folder', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-          },
-          body: JSON.stringify({
-            name: folderName,
-            parentId: currentFolderId,
-          }),
-        });
-        const data = await response.json();
-        if (data.error) {
-          alert('Lỗi khi tạo thư mục');
-        } else {
-          alert('Tạo thư mục thành công');
-          const refreshResponse = await fetch('/api/drive', {
-            headers: {
-              'Cache-Control': 'no-cache',
-              'Pragma': 'no-cache'
+        try {
+            const response = await fetch('/api/drive/create-folder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache',
+                },
+                body: JSON.stringify({
+                    name: folderName,
+                    parentId: currentFolderId,
+                }),
+            });
+            const data = await response.json();
+            if (data.error) {
+                alert('Lỗi khi tạo thư mục');
+            } else {
+                alert('Tạo thư mục thành công');
+                
+                // Đảm bảo fetch mới nhất từ drive
+                const refreshResponse = await fetch(
+                    currentFolderId 
+                        ? `/api/drive?folderId=${currentFolderId}`
+                        : '/api/drive',
+                    {
+                        headers: {
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Expires': '0'
+                        },
+                        cache: 'no-store'
+                    }
+                );
+                const refreshData = await refreshResponse.json();
+                setFiles(sortFilesByType(refreshData.files));
             }
-          });
-          const refreshData = await refreshResponse.json();
-          setFiles(sortFilesByType(refreshData.files));
+        } catch (error) {
+            console.error('Lỗi khi tạo thư mục:', error);
         }
-      } catch (error) {
-        console.error('Lỗi khi tạo thư mục:', error);
-      }
     }
   };
 
@@ -174,12 +183,21 @@ export default function Home() {
           alert('Lỗi khi tải file lên');
         } else {
           alert('Tải file lên thành công');
-          const refreshResponse = await fetch('/api/drive', {
-            headers: {
-              'Cache-Control': 'no-cache',
-              'Pragma': 'no-cache'
+          
+          // Đảm bảo fetch mới nhất từ drive
+          const refreshResponse = await fetch(
+            currentFolderId 
+              ? `/api/drive?folderId=${currentFolderId}`
+              : '/api/drive',
+            {
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+              },
+              cache: 'no-store'
             }
-          });
+          );
           const refreshData = await refreshResponse.json();
           setFiles(sortFilesByType(refreshData.files));
         }

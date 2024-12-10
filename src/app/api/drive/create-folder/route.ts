@@ -1,6 +1,8 @@
 import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
+import Redis from 'ioredis';
 
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 const auth = new google.auth.GoogleAuth({
     credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS || '{}'),
     scopes: ['https://www.googleapis.com/auth/drive'],
@@ -21,6 +23,14 @@ export async function POST(request: Request) {
             requestBody: fileMetadata,
             fields: 'id',
         });
+
+        // Xác định key chính xác của thư mục cha
+        const parentKey = parentId 
+            ? `drive_files:${parentId}_`
+            : 'drive_files:root_';
+            
+        // Xóa cache
+        const deleteResult = await redis.del(parentKey);
 
         return NextResponse.json(response.data);
     } catch (error) {

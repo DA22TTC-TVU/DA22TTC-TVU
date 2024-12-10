@@ -1,5 +1,9 @@
 import { google, drive_v3 } from 'googleapis';
 import { NextResponse } from 'next/server';
+import Redis from 'ioredis';
+
+// Khởi tạo Redis client
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 const auth = new google.auth.GoogleAuth({
     credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS || '{}'),
@@ -13,6 +17,21 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const folderId = searchParams.get('folderId');
         const searchTerm = searchParams.get('q');
+
+        // Tạo cache key dựa trên tham số
+        const cacheKey = `drive_files:${folderId || 'root'}_${searchTerm || ''}`;
+        
+        // Kiểm tra cache
+        const cachedData = await redis.get(cacheKey);
+        if (cachedData) {
+            return NextResponse.json(JSON.parse(cachedData), {
+                headers: {
+                    'Cache-Control': 'no-store, no-cache, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'X-Cache': 'HIT'
+                }
+            });
+        }
 
         let query = '';
 
@@ -34,16 +53,19 @@ export async function GET(request: Request) {
             pageSize: 1000
         } as drive_v3.Params$Resource$Files$List);
 
-        const totalFiles = response.data.files?.length || 0;
-
-        return NextResponse.json({
+        const result = {
             files: response.data.files,
-            totalFiles
-        }, {
+            totalFiles: response.data.files?.length || 0
+        };
+
+        // Lưu vào cache
+        await redis.setex(cacheKey, 300, JSON.stringify(result));
+
+        return NextResponse.json(result, {
             headers: {
-                'Cache-Control': 'no-store, must-revalidate',
+                'Cache-Control': 'no-store, no-cache, must-revalidate',
                 'Pragma': 'no-cache',
-                'Expires': '0'
+                'X-Cache': 'MISS'
             }
         });
     } catch (error) {
