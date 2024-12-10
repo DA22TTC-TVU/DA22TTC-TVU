@@ -172,9 +172,21 @@ export default function Home() {
         setIsCreateFolderModalOpen(false);
         setNewFolderName('');
 
+        // Cập nhật folderHistory và folderPath trước khi vào thư mục mới
+        if (currentFolderId) {
+          setFolderHistory([...folderHistory, currentFolderId]);
+          setFolderPath([...folderPath, { id: currentFolderId, name: currentFolderName }]);
+        }
+
         // Tự động vào thư mục mới tạo
         if (data.id) {
-          handleFolderClick(data.id);
+          setCurrentFolderId(data.id);
+          setCurrentFolderName(newFolderName);
+
+          // Lấy nội dung thư mục mới
+          const folderResponse = await fetch(`/api/drive?folderId=${data.id}`);
+          const folderData = await folderResponse.json();
+          setFiles(sortFilesByType(folderData.files));
         }
       }
     } catch (error) {
