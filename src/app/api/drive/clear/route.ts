@@ -13,31 +13,21 @@ const drive = google.drive({ version: 'v3', auth });
 
 export async function DELETE() {
     try {
-        // Lấy tất cả file không nằm trong thùng rác
-        const response = await drive.files.list({
-            q: "trashed = false",
-            fields: 'files(id, name)',
-            pageSize: 1000
-        });
-
-        // Lấy tất cả file trong thùng rác
+        // Chỉ lấy các file trong thùng rác
         const trashedResponse = await drive.files.list({
             q: "trashed = true",
             fields: 'files(id, name)',
             pageSize: 1000
         });
 
-        const regularFiles = response.data.files || [];
         const trashedFiles = trashedResponse.data.files || [];
+        const errors: any[] = [];
 
-        const files = [...regularFiles, ...trashedFiles];
-        const errors: any[] | undefined = [];
-
-        if (files.length > 0) {
+        if (trashedFiles.length > 0) {
             // Xử lý song song, mỗi lần 10 file
             const batchSize = 10;
-            for (let i = 0; i < files.length; i += batchSize) {
-                const batch = files.slice(i, i + batchSize);
+            for (let i = 0; i < trashedFiles.length; i += batchSize) {
+                const batch = trashedFiles.slice(i, i + batchSize);
                 await Promise.all(
                     batch.map(async (file) => {
                         if (file.id) {
@@ -60,7 +50,7 @@ export async function DELETE() {
                 );
 
                 // Log tiến trình
-                console.log(`Đã xử lý ${i + batch.length}/${files.length} files`);
+                console.log(`Đã xử lý ${i + batch.length}/${trashedFiles.length} files`);
             }
         }
 
@@ -68,9 +58,8 @@ export async function DELETE() {
         await redis.flushall();
 
         return NextResponse.json({
-            message: errors.length > 0 ? 'Xóa dữ liệu một phần thành công' : 'Đã xóa thành công tất cả dữ liệu',
-            deletedCount: files.length - errors.length,
-            regularFilesCount: regularFiles.length,
+            message: errors.length > 0 ? 'Xóa dữ liệu một phần thành công' : 'Đã xóa thành công tất cả file trong thùng rác',
+            deletedCount: trashedFiles.length - errors.length,
             trashedDeletedCount: trashedFiles.length,
             errors: errors.length > 0 ? errors : undefined
         });
