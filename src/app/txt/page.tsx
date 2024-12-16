@@ -10,6 +10,7 @@ import 'highlight.js/styles/atom-one-dark.css';
 import Skeleton from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
 import { useRouter } from 'next/navigation';
+import { Toaster, toast } from 'react-hot-toast';
 
 const NotePage = () => {
     const router = useRouter();
@@ -78,7 +79,14 @@ const NotePage = () => {
 
     const handleCopy = (content: string) => {
         navigator.clipboard.writeText(content);
-        alert('Đã sao chép ghi chú!');
+        toast.success('Đã sao chép ghi chú!', {
+            duration: 2000,
+            position: 'bottom-right',
+            style: {
+                background: '#333',
+                color: '#fff'
+            },
+        });
     };
 
     const handleGoBack = () => {
@@ -87,6 +95,7 @@ const NotePage = () => {
 
     return (
         <div className="p-4">
+            <Toaster />
             <button
                 onClick={handleGoBack}
                 className="mb-4 text-gray-600 hover:text-gray-800 flex items-center gap-2"

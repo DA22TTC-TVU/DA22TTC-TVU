@@ -2,17 +2,27 @@
 import React from 'react';
 import { DriveInfo } from '../types';
 
+declare module 'react' {
+    interface InputHTMLAttributes<T> extends HTMLAttributes<T> {
+        webkitdirectory?: string;
+        directory?: string;
+    }
+}
+
 interface SidebarProps {
     driveInfo: DriveInfo | null;
     onCreateFolder: () => void;
     onUploadFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onUploadFolder: (e: React.ChangeEvent<HTMLInputElement>) => void;
     formatBytes: (bytes: number) => string;
     isOpen: boolean;
     onClose: () => void;
     fileInputRef: React.RefObject<HTMLInputElement>;
 }
 
-export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, formatBytes, isOpen, onClose, fileInputRef }: SidebarProps) {
+export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUploadFolder, formatBytes, isOpen, onClose, fileInputRef }: SidebarProps) {
+    const folderInputRef = React.useRef<HTMLInputElement>(null);
+
     const handleCreateFolder = () => {
         onClose();
         onCreateFolder();
@@ -55,7 +65,7 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, forma
                     <span>Tạo Thư Mục</span>
                 </button>
 
-                <div className="relative mb-4">
+                <div className="relative mb-2">
                     <label
                         htmlFor="fileInput"
                         className="flex items-center space-x-2 px-6 py-3 rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer bg-white"
@@ -76,6 +86,32 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, forma
                         }}
                         className="hidden"
                         ref={fileInputRef}
+                    />
+                </div>
+
+                <div className="relative mb-4">
+                    <label
+                        htmlFor="folderInput"
+                        className="flex items-center space-x-2 px-6 py-3 rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer bg-white"
+                        onClick={onClose}
+                    >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                        <span>Tải Thư Mục Lên</span>
+                    </label>
+                    <input
+                        id="folderInput"
+                        type="file"
+                        webkitdirectory=""
+                        directory=""
+                        multiple
+                        onChange={(e) => {
+                            onUploadFolder(e);
+                            onClose();
+                        }}
+                        className="hidden"
+                        ref={folderInputRef}
                     />
                 </div>
 

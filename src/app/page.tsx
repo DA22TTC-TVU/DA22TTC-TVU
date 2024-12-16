@@ -200,7 +200,10 @@ export default function Home() {
     const files = event.target.files;
     if (!files) return;
 
-    Array.from(files).forEach(async (file) => {
+    const uploadPromises: Promise<void>[] = [];
+    const tempFiles: FileItem[] = [];
+
+    Array.from(files).forEach(file => {
       const tempFile: FileItem = {
         id: `temp-${Date.now()}-${file.name}`,
         name: file.name,
@@ -211,98 +214,98 @@ export default function Home() {
         uploadProgress: 0
       };
 
-      setFiles(prev => sortFilesByType([...prev, tempFile]));
+      tempFiles.push(tempFile);
 
-      try {
-        // Lấy signed URL
-        const urlResponse = await fetch('/api/drive/get-upload-url', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            fileName: file.name,
-            mimeType: file.type,
-            parentId: currentFolderId
-          }),
-        });
+      const uploadPromise = new Promise<void>((resolve, reject) => {
+        const upload = async () => {
+          try {
+            // Lấy signed URL
+            const urlResponse = await fetch('/api/drive/get-upload-url', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                fileName: file.name,
+                mimeType: file.type,
+                parentId: currentFolderId
+              }),
+            });
 
-        const { uploadUrl } = await urlResponse.json();
+            const { uploadUrl } = await urlResponse.json();
 
-        // Upload trực tiếp lên Drive
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', uploadUrl, true);
-        xhr.setRequestHeader('Content-Type', file.type);
+            // Upload file
+            await new Promise<void>((uploadResolve, uploadReject) => {
+              const xhr = new XMLHttpRequest();
+              xhr.open('PUT', uploadUrl, true);
+              xhr.setRequestHeader('Content-Type', file.type);
 
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const progress = Math.round((event.loaded / event.total) * 100);
-            setFiles(prev => prev.map(f =>
-              f.id === tempFile.id ? { ...f, uploadProgress: progress } : f
-            ));
-
-            // Khi progress đạt 100%, đợi một chút rồi mới refresh
-            if (progress === 100) {
-              setTimeout(async () => {
-                const refreshResponse = await fetch(
-                  currentFolderId
-                    ? `/api/drive?folderId=${currentFolderId}`
-                    : '/api/drive',
-                  {
-                    headers: {
-                      'Cache-Control': 'no-cache, no-store, must-revalidate',
-                      'Pragma': 'no-cache',
-                      'Expires': '0'
-                    },
-                    cache: 'no-store'
-                  }
-                );
-                const refreshData = await refreshResponse.json();
-                setFiles(sortFilesByType(refreshData.files));
-              }, 2500);
-            }
-          }
-        };
-
-        xhr.onload = async () => {
-          if (xhr.status === 200) {
-            // Xóa file tạm và refresh danh sách sau 2500ms
-            setTimeout(async () => {
-              setFiles(prev => prev.filter(f => f.id !== tempFile.id));
-              const refreshResponse = await fetch(
-                currentFolderId
-                  ? `/api/drive?folderId=${currentFolderId}`
-                  : '/api/drive',
-                {
-                  headers: {
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0'
-                  },
-                  cache: 'no-store'
+              xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                  const progress = Math.round((event.loaded / event.total) * 100);
+                  setFiles(prev => prev.map(f =>
+                    f.id === tempFile.id ? { ...f, uploadProgress: progress } : f
+                  ));
                 }
-              );
-              const refreshData = await refreshResponse.json();
-              setFiles(sortFilesByType(refreshData.files));
-            }, 2500);
-          } else {
-            alert(`Lỗi khi tải file ${file.name} lên`);
-            setFiles(prev => prev.filter(f => f.id !== tempFile.id));
+              };
+
+              xhr.onload = () => {
+                if (xhr.status === 200) {
+                  uploadResolve();
+                } else {
+                  uploadReject(new Error(`Upload failed with status ${xhr.status}`));
+                }
+              };
+
+              xhr.onerror = () => uploadReject(new Error('Upload failed'));
+              xhr.send(file);
+            });
+
+            resolve();
+          } catch (error) {
+            reject(error);
           }
         };
 
-        xhr.onerror = () => {
-          console.error(`Lỗi khi tải file ${file.name} lên`);
-          setFiles(prev => prev.filter(f => f.id !== tempFile.id));
-        };
+        upload();
+      });
 
-        xhr.send(file);
-
-      } catch (error) {
-        console.error(`Lỗi khi tải file ${file.name} lên:`, error);
-        setFiles(prev => prev.filter(f => f.id !== tempFile.id));
-      }
+      uploadPromises.push(uploadPromise);
     });
+
+    // Thêm các file tạm vào danh sách
+    setFiles(prev => sortFilesByType([...prev, ...tempFiles]));
+
+    try {
+      // Đợi tất cả file upload xong
+      await Promise.all(uploadPromises);
+
+      // Xóa tất cả file tạm và refresh danh sách một lần
+      setTimeout(async () => {
+        setFiles(prev => prev.filter(f => !tempFiles.some(temp => temp.id === f.id)));
+
+        const refreshResponse = await fetch(
+          currentFolderId
+            ? `/api/drive?folderId=${currentFolderId}`
+            : '/api/drive',
+          {
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            },
+            cache: 'no-store'
+          }
+        );
+        const refreshData = await refreshResponse.json();
+        setFiles(sortFilesByType(refreshData.files));
+      }, 2500); // Đợi 1 giây sau khi tất cả upload xong
+
+    } catch (error) {
+      console.error('Lỗi khi upload files:', error);
+      // Xóa các file tạm trong trường hợp lỗi
+      setFiles(prev => prev.filter(f => !tempFiles.some(temp => temp.id === f.id)));
+    }
 
     event.target.value = '';
   };
@@ -381,6 +384,120 @@ export default function Home() {
     }
   };
 
+  const handleUploadFolder = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    const rootFolderName = files[0].webkitRelativePath.split('/')[0];
+
+    // Tạo thư mục tạm để hiển thị
+    const tempFolder: FileItem = {
+      id: `temp-folder-${Date.now()}`,
+      name: rootFolderName,
+      mimeType: 'application/vnd.google-apps.folder',
+      size: Array.from(files).reduce((total, file) => total + file.size, 0),
+      createdTime: new Date().toISOString(),
+      isUploading: true,
+      uploadProgress: 0
+    };
+
+    setFiles(prev => sortFilesByType([tempFolder, ...prev]));
+
+    try {
+      const totalSize = Array.from(files).reduce((total, file) => total + file.size, 0);
+      let uploadedSize = 0;
+
+      // Map để lưu trữ ID của các thư mục đã tạo
+      const folderMap = new Map<string, string>();
+
+      // Tạo thư mục gốc
+      const rootFolderResponse = await fetch('/api/drive/create-folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: rootFolderName,
+          parentId: currentFolderId
+        })
+      });
+      const { id: rootFolderId } = await rootFolderResponse.json();
+      folderMap.set(rootFolderName, rootFolderId);
+
+      // Xử lý từng file
+      for (const file of Array.from(files)) {
+        const pathParts = file.webkitRelativePath.split('/');
+        let currentParentId = rootFolderId;
+
+        // Tạo cấu trúc thư mục nếu cần
+        for (let i = 1; i < pathParts.length - 1; i++) {
+          const folderPath = pathParts.slice(0, i + 1).join('/');
+
+          if (!folderMap.has(folderPath)) {
+            const folderResponse = await fetch('/api/drive/create-folder', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: pathParts[i],
+                parentId: currentParentId
+              })
+            });
+            const { id: folderId } = await folderResponse.json();
+            folderMap.set(folderPath, folderId);
+            currentParentId = folderId;
+          } else {
+            currentParentId = folderMap.get(folderPath)!;
+          }
+        }
+
+        // Upload file vào thư mục tương ứng
+        const formData = new FormData();
+        const fileName = file.name.split('/').pop() || file.name; // Lấy phần cuối của đường dẫn
+        const fileBlob = new Blob([file], { type: file.type });
+        const cleanFile = new File([fileBlob], fileName, { type: file.type });
+        formData.append('file', cleanFile);
+        formData.append('parentId', currentParentId);
+
+        await fetch('/api/drive/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        uploadedSize += file.size;
+        const progress = Math.round((uploadedSize / totalSize) * 100);
+
+        setFiles(prev => prev.map(f =>
+          f.id === tempFolder.id ? { ...f, uploadProgress: progress } : f
+        ));
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 2500));
+
+      const refreshResponse = await fetch(
+        currentFolderId ? `/api/drive?folderId=${currentFolderId}` : '/api/drive',
+        { headers: { 'Cache-Control': 'no-cache' } }
+      );
+      const refreshData = await refreshResponse.json();
+      setFiles(sortFilesByType(refreshData.files));
+
+    } catch (error) {
+      console.error('Lỗi:', error);
+      setFiles(prev => prev.filter(f => f.id !== tempFolder.id));
+      alert('Có lỗi xảy ra khi tải lên thư mục');
+    }
+
+    event.target.value = '';
+  };
+
+  const checkFolderContent = async (folderId: string) => {
+    try {
+      const response = await fetch(`/api/drive?folderId=${folderId}`);
+      const data = await response.json();
+      return data.files.some((file: FileItem) => file.mimeType === 'application/vnd.google-apps.folder');
+    } catch (error) {
+      console.error('Lỗi khi kiểm tra nội dung thư mục:', error);
+      return false;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-[1800px] mx-auto">
@@ -405,6 +522,7 @@ export default function Home() {
             driveInfo={driveInfo}
             onCreateFolder={handleCreateFolder}
             onUploadFile={handleUploadFile}
+            onUploadFolder={handleUploadFolder}
             formatBytes={formatBytes}
             isOpen={isSidebarOpen}
             onClose={() => setIsSidebarOpen(false)}
@@ -424,6 +542,9 @@ export default function Home() {
             onBreadcrumbClick={handleBreadcrumbClick}
             onBackClick={handleBackClick}
             onDownload={handleDownload}
+            onUploadFile={handleUploadFile}
+            onUploadFolder={handleUploadFolder}
+            onCheckFolderContent={checkFolderContent}
           />
         </div>
       </div>
