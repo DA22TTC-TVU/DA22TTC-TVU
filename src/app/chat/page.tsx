@@ -280,6 +280,34 @@ export default function ChatPage() {
         }
     };
 
+    const handlePaste = (e: ClipboardEvent) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const file = items[i].getAsFile();
+                if (file && file.size <= 5 * 1024 * 1024) {
+                    setSelectedImages(prev => [...prev, file]);
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setImagePreviews(prev => [...prev, reader.result as string]);
+                    };
+                    reader.readAsDataURL(file);
+                } else if (file) {
+                    toast.error('Ảnh vượt quá giới hạn 5MB');
+                }
+            }
+        }
+    };
+
+    useEffect(() => {
+        document.addEventListener('paste', handlePaste);
+        return () => {
+            document.removeEventListener('paste', handlePaste);
+        };
+    }, []);
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
             <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
