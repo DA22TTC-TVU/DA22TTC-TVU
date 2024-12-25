@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faCopy, faImage, faFileUpload, faCompress, faExpand, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faCopy, faImage, faFileUpload, faCompress, faExpand, faTimes, faCode, faSpinner, faPlay } from '@fortawesome/free-solid-svg-icons';
 import { useRouter } from 'next/navigation';
 import { Toaster, toast } from 'react-hot-toast';
 import ReactMarkdown from 'react-markdown';
@@ -10,6 +10,8 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 import TextareaAutosize from 'react-textarea-autosize';
+import dynamic from 'next/dynamic';
+const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
 interface Message {
     role: 'user' | 'assistant';
@@ -50,7 +52,10 @@ const SUPPORTED_FILE_TYPES = [
 interface CodePreviewModal {
     isOpen: boolean;
     content: string;
+    originalCode: string;
     isFullscreen: boolean;
+    mode?: 'preview' | 'run' | 'result' | 'edit';
+    language?: string;
 }
 
 export default function ChatPage() {
@@ -72,8 +77,12 @@ export default function ChatPage() {
     const [codePreview, setCodePreview] = useState<CodePreviewModal>({
         isOpen: false,
         content: '',
-        isFullscreen: false
+        originalCode: '',
+        isFullscreen: false,
+        mode: 'preview',
+        language: ''
     });
+    const [isExecuting, setIsExecuting] = useState(false);
 
     const suggestionMessages = [
         "Hướng dẫn cách viết một REST API đơn giản với Node.js",
@@ -332,19 +341,46 @@ export default function ChatPage() {
     }, []);
 
     // Thêm hàm để mở/đóng modal
-    const handleCodePreview = (code: string) => {
+    const handleCodePreview = (code: string, language?: string) => {
+        const cleanCode = code.replace(/^```(\w+)?\n/, '').replace(/```$/, '');
+
         setCodePreview({
             isOpen: true,
-            content: code,
-            isFullscreen: false
+            content: cleanCode,
+            originalCode: cleanCode,
+            isFullscreen: false,
+            mode: language === 'javascript' || language === 'python' ? 'run' : 'preview',
+            language: language || detectLanguage(cleanCode)
         });
+    };
+
+    // Thêm hàm phát hiện ngôn ngữ lập trình
+    const detectLanguage = (code: string): string => {
+        // Kiểm tra các từ khóa đặc trưng của từng ngôn ngữ
+        if (code.includes('def ') || code.includes('import ') || code.includes('print(')) {
+            return 'python';
+        }
+        if (code.includes('function') || code.includes('const ') || code.includes('let ')) {
+            return 'javascript';
+        }
+        if (code.includes('<html') || code.includes('<!DOCTYPE')) {
+            return 'html';
+        }
+        if (code.includes('class') && code.includes('{')) {
+            return 'java';
+        }
+        // Mặc định là javascript
+        return 'javascript';
     };
 
     const closeCodePreview = () => {
         setCodePreview({
             isOpen: false,
             content: '',
-            isFullscreen: false
+            originalCode: '',
+            isFullscreen: false,
+            mode: 'preview',
+            language: ''
         });
     };
 
@@ -353,6 +389,46 @@ export default function ChatPage() {
             ...prev,
             isFullscreen: !prev.isFullscreen
         }));
+    };
+
+    const handleRunCode = async (code: string, language: string) => {
+        try {
+            setIsExecuting(true);
+            setCodePreview(prev => ({
+                ...prev,
+                mode: 'result',
+                content: '',
+            }));
+
+            const response = await fetch('/api/e2b/run', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    code,
+                    language
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Lỗi khi chạy code');
+            }
+
+            setCodePreview(prev => ({
+                ...prev,
+                content: data.output,
+                mode: 'result'
+            }));
+
+        } catch (error) {
+            console.error('Lỗi khi chạy code:', error);
+            toast.error('Có lỗi xảy ra khi chạy code');
+        } finally {
+            setIsExecuting(false);
+        }
     };
 
     return (
@@ -484,18 +560,27 @@ export default function ChatPage() {
                                                                 return !inline && match ? (
                                                                     <div className="relative">
                                                                         <div className="absolute -top-2 right-0 flex gap-2 z-10">
-                                                                            {match[1] === 'html' && (
+                                                                            {(match[1] === 'javascript' || match[1] === 'js' || match[1] === 'python' || match[1] === 'py' || match[1] === 'html') && (
                                                                                 <button
-                                                                                    onClick={() => handleCodePreview(String(children))}
+                                                                                    onClick={() => {
+                                                                                        const code = String(children).replace(/\n$/, '');
+                                                                                        setCodePreview({
+                                                                                            isOpen: true,
+                                                                                            content: code,
+                                                                                            originalCode: code,
+                                                                                            isFullscreen: false,
+                                                                                            mode: 'edit',
+                                                                                            language: match[1]
+                                                                                        });
+                                                                                    }}
                                                                                     className="p-2 bg-gray-700 rounded-lg 
                                                                                     hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm"
                                                                                 >
-                                                                                    <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                                                    </svg>
+                                                                                    <FontAwesomeIcon icon={match[1] === 'html' ? faCode : faPlay} className="w-4 h-4" />
+                                                                                    <span>{match[1] === 'html' ? 'Xem' : 'Chạy'}</span>
                                                                                 </button>
                                                                             )}
+
                                                                             <button
                                                                                 onClick={() => copyToClipboard(String(children))}
                                                                                 className="p-2 bg-gray-700 rounded-lg 
@@ -923,9 +1008,17 @@ export default function ChatPage() {
                             ${codePreview.isFullscreen ? 'fixed inset-0 w-full h-full rounded-none' : 'sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full'}`}>
                             <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                                    Xem trước HTML
+                                    Chạy code
                                 </h3>
                                 <div className="flex items-center gap-2">
+                                    {codePreview.mode === 'run' && (
+                                        <button
+                                            onClick={() => handleRunCode(codePreview.content, codePreview.language || '')}
+                                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                                        >
+                                            Chạy
+                                        </button>
+                                    )}
                                     <button
                                         onClick={toggleFullscreen}
                                         className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -949,12 +1042,139 @@ export default function ChatPage() {
                                 </div>
                             </div>
                             <div className={`${codePreview.isFullscreen ? 'h-[calc(100vh-56px)]' : 'h-[80vh]'} overflow-auto`}>
-                                <iframe
-                                    srcDoc={codePreview.content}
-                                    className="w-full h-full"
-                                    title="HTML Preview"
-                                    sandbox="allow-scripts"
-                                />
+                                {codePreview.mode === 'preview' ? (
+                                    <iframe
+                                        srcDoc={codePreview.content}
+                                        className="w-full h-full"
+                                        title="HTML Preview"
+                                        sandbox="allow-scripts"
+                                    />
+                                ) : codePreview.mode === 'result' ? (
+                                    <div className="p-4 h-full">
+                                        {codePreview.language === 'html' ? (
+                                            <>
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300">
+                                                        Kết quả HTML:
+                                                    </h3>
+                                                    <button
+                                                        onClick={() => setCodePreview(prev => ({
+                                                            ...prev,
+                                                            mode: 'edit',
+                                                            content: prev.originalCode
+                                                        }))}
+                                                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 
+                                                            text-white rounded-lg transition-colors text-sm
+                                                            flex items-center gap-2"
+                                                    >
+                                                        <FontAwesomeIcon icon={faCode} className="w-4 h-4" />
+                                                        <span>Chỉnh sửa HTML</span>
+                                                    </button>
+                                                </div>
+                                                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg h-[calc(100%-3rem)] overflow-auto">
+                                                    <iframe
+                                                        srcDoc={codePreview.originalCode}
+                                                        className="w-full h-full"
+                                                        title="HTML Preview"
+                                                        sandbox="allow-scripts"
+                                                    />
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                {isExecuting ? (
+                                                    <div className="flex flex-col items-center justify-center space-y-4 text-gray-400">
+                                                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-400"></div>
+                                                        <p>Đang thực thi lệnh...</p>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="flex items-center justify-between mb-4">
+                                                            <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300">
+                                                                Kết quả thực thi:
+                                                            </h3>
+                                                            <button
+                                                                onClick={() => setCodePreview(prev => ({
+                                                                    ...prev,
+                                                                    mode: 'edit',
+                                                                    content: prev.originalCode
+                                                                }))}
+                                                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 
+                                                                    text-white rounded-lg transition-colors text-sm
+                                                                    flex items-center gap-2"
+                                                            >
+                                                                <FontAwesomeIcon icon={faCode} className="w-4 h-4" />
+                                                                <span>Chỉnh sửa code</span>
+                                                            </button>
+                                                        </div>
+                                                        <pre className="whitespace-pre-wrap bg-gray-900 p-4 rounded-lg text-green-400 overflow-auto max-h-[calc(100vh-200px)]">
+                                                            {codePreview.content}
+                                                        </pre>
+                                                    </>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                ) : codePreview.mode === 'edit' ? (
+                                    <div className="h-full relative">
+                                        <MonacoEditor
+                                            height="100%"
+                                            defaultLanguage={codePreview.language || 'javascript'}
+                                            defaultValue={codePreview.content}
+                                            theme="vs-dark"
+                                            onChange={(value) => {
+                                                if (value) setCodePreview(prev => ({
+                                                    ...prev,
+                                                    content: value,
+                                                    originalCode: value
+                                                }));
+                                            }}
+                                            options={{
+                                                minimap: { enabled: false },
+                                                fontSize: 14,
+                                                lineNumbers: 'on',
+                                                roundedSelection: false,
+                                                scrollBeyondLastLine: false,
+                                                automaticLayout: true
+                                            }}
+                                        />
+                                        <div className="absolute bottom-4 right-4">
+                                            <button
+                                                onClick={() => {
+                                                    if (codePreview.language === 'html') {
+                                                        setCodePreview(prev => ({
+                                                            ...prev,
+                                                            mode: 'result',
+                                                            content: prev.content
+                                                        }));
+                                                    } else {
+                                                        handleRunCode(codePreview.content, codePreview.language || '');
+                                                    }
+                                                }}
+                                                className="px-4 py-2 bg-green-600 hover:bg-green-700 
+                                                    text-white rounded-lg transition-colors text-sm
+                                                    flex items-center gap-2"
+                                                disabled={isExecuting}
+                                            >
+                                                {isExecuting ? (
+                                                    <>
+                                                        <FontAwesomeIcon icon={faSpinner} className="w-4 h-4 animate-spin" />
+                                                        <span>Đang chạy...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <FontAwesomeIcon icon={codePreview.language === 'html' ? faCode : faPlay} className="w-4 h-4" />
+                                                        <span>{codePreview.language === 'html' ? 'Xem kết quả' : 'Chạy code'}</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-4">
+                                        <pre className="whitespace-pre-wrap">{codePreview.content}</pre>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
