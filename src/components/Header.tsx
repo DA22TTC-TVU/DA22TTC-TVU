@@ -105,9 +105,18 @@ export default function Header({ searchTerm, onSearchChange, isAISearch, onToggl
                 </button>
 
                 <button
+                    className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-6 py-2.5 rounded-xl
+                    hover:from-purple-600 hover:to-indigo-600 active:scale-95 shadow-md hover:shadow-lg
+                    transition-all duration-200 font-medium"
+                    onClick={() => router.push('/chat')}
+                >
+                    Chat AI
+                </button>
+
+                <button
                     className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-2.5 rounded-xl
                     hover:from-blue-600 hover:to-indigo-600 active:scale-95 shadow-md hover:shadow-lg
-                    transition-all duration-200 font-medium mt-4 md:mt-0"
+                    transition-all duration-200 font-medium"
                     onClick={() => router.push('/txt')}
                 >
                     Ghi chú
