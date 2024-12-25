@@ -349,9 +349,9 @@ export default function FileList({
             )}
 
             {/* Breadcrumb Navigation */}
-            <div className="p-4 md:p-6 pb-2">
+            <div className="p-2 md:p-4 md:pb-2">
                 {currentFolderId && (
-                    <div className="flex items-center space-x-2 text-sm mb-2 overflow-x-auto whitespace-nowrap">
+                    <div className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm mb-2 overflow-x-auto whitespace-nowrap">
                         <span
                             className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 
                             cursor-pointer font-medium flex-shrink-0"
@@ -361,12 +361,12 @@ export default function FileList({
                         </span>
                         {folderPath.map((folder, index) => (
                             <React.Fragment key={folder.id}>
-                                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-3 h-3 md:w-4 md:h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                                 <span
                                     className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 
-                                    cursor-pointer font-medium truncate max-w-[100px] md:max-w-[200px]"
+                                    cursor-pointer font-medium truncate max-w-[80px] md:max-w-[200px]"
                                     onClick={() => onBreadcrumbClick(folder.id, index)}
                                 >
                                     {folder.name}
@@ -391,17 +391,17 @@ export default function FileList({
                     {currentFolderId && (
                         <button
                             onClick={onBackClick}
-                            className="inline-flex items-center px-4 py-2 
+                            className="inline-flex items-center px-2 md:px-4 py-2 
                                 text-gray-700 dark:text-gray-200 
                                 bg-white dark:bg-gray-800 
                                 hover:bg-gray-50 dark:hover:bg-gray-700
                                 rounded-xl border border-gray-200 dark:border-gray-700 
                                 shadow-sm transition-all duration-200"
                         >
-                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-5 h-5 md:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                             </svg>
-                            <span className="font-medium">Quay lại</span>
+                            <span className="hidden md:inline font-medium">Quay lại</span>
                         </button>
                     )}
 
