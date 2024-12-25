@@ -4,7 +4,7 @@ import { ref, onValue, push, set, remove } from 'firebase/database';
 import { getDatabaseInstance } from '../../lib/firebaseConfig';
 import TextareaAutosize from 'react-textarea-autosize';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCopy, faTrash, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { faCopy, faTrash, faArrowLeft, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/atom-one-dark.css';
 import Skeleton from 'react-loading-skeleton';
@@ -17,6 +17,9 @@ const NotePage = () => {
     const [notes, setNotes] = useState<{ id: string; content: any; timestamp: number }[]>([]);
     const [newNote, setNewNote] = useState('');
     const [loading, setLoading] = useState(true);
+    const [expandedNotes, setExpandedNotes] = useState<{ [key: string]: boolean }>({});
+    const [deleteMode, setDeleteMode] = useState<string | null>(null);
+    const [deleteCode, setDeleteCode] = useState('');
 
     useEffect(() => {
         const fetchData = async () => {
@@ -67,7 +70,9 @@ const NotePage = () => {
             const database = await getDatabaseInstance();
             const noteRef = ref(database, `notes/${id}`);
             await remove(noteRef);
+            toast.success('Đã xóa ghi chú!');
         }
+        setDeleteMode(null);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -91,6 +96,37 @@ const NotePage = () => {
 
     const handleGoBack = () => {
         router.push('/');
+    };
+
+    const toggleNoteExpansion = (id: string) => {
+        setExpandedNotes(prev => ({
+            ...prev,
+            [id]: !prev[id]
+        }));
+    };
+
+    const countLines = (text: string): number => {
+        return text.split('\n').length;
+    };
+
+    const handleNoteClick = (content: string, id: string) => {
+        if (deleteMode === id) {
+            if (deleteCode.trim().toUpperCase() === 'XOA') {
+                handleDeleteNote(id);
+            }
+            setDeleteMode(null);
+            setDeleteCode('');
+        } else {
+            navigator.clipboard.writeText(content);
+            toast.success('Đã sao chép ghi chú!', {
+                duration: 2000,
+                position: 'bottom-right',
+                style: {
+                    background: '#333',
+                    color: '#fff'
+                },
+            });
+        }
     };
 
     return (
@@ -126,32 +162,96 @@ const NotePage = () => {
                     <Skeleton count={5} height={100} />
                 ) : (
                     notes.map(note => (
-                        <li key={note.id} className="p-2 bg-gray-100 rounded relative">
-                            <div className="flex justify-between items-start">
-                                <pre className="flex-1">
+                        <li
+                            key={note.id}
+                            className={`p-2 rounded relative cursor-pointer transition-colors ${deleteMode === note.id ? 'bg-red-100 hover:bg-red-200' : 'bg-gray-100 hover:bg-gray-200'
+                                }`}
+                            onClick={() => handleNoteClick(note.content, note.id)}
+                            onContextMenu={(e) => {
+                                e.preventDefault();
+                                setDeleteMode(note.id);
+                                setDeleteCode('');
+                            }}
+                        >
+                            <div className="flex justify-between items-start relative">
+                                <pre className={`flex-1 overflow-x-auto ${!expandedNotes[note.id] ? 'max-h-[150px] overflow-y-hidden' : ''}`}>
                                     <code
-                                        className="hljs"
+                                        className="hljs block"
                                         dangerouslySetInnerHTML={{
                                             __html: hljs.highlightAuto(note.content).value
                                         }}
                                     />
                                 </pre>
-                                <div className="flex flex-col space-y-2 ml-4">
-                                    <button
-                                        onClick={() => handleCopy(note.content)}
-                                        className="text-gray-500 hover:text-gray-700"
+                                {countLines(note.content) > 5 && !expandedNotes[note.id] && (
+                                    <div
+                                        className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-gray-100 to-transparent cursor-pointer flex items-center justify-center"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleNoteExpansion(note.id);
+                                        }}
                                     >
-                                        <FontAwesomeIcon icon={faCopy} size="lg" />
-                                    </button>
+                                        <button className="bg-gray-200 hover:bg-gray-300 rounded-full p-2 mt-8">
+                                            <FontAwesomeIcon icon={faChevronDown} size="lg" />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            {countLines(note.content) > 5 && expandedNotes[note.id] && (
+                                <div className="flex justify-center mt-4">
                                     <button
-                                        onClick={() => handleDeleteNote(note.id)}
-                                        className="text-red-500 hover:text-red-700"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleNoteExpansion(note.id);
+                                        }}
+                                        className="bg-gray-200 hover:bg-gray-300 rounded-full p-2"
                                     >
-                                        <FontAwesomeIcon icon={faTrash} size="lg" />
+                                        <FontAwesomeIcon icon={faChevronUp} size="lg" />
                                     </button>
                                 </div>
-                            </div>
+                            )}
                             <div className="text-sm text-gray-500 mt-2">{new Date(note.timestamp).toLocaleString()}</div>
+
+                            {/* Delete mode overlay */}
+                            {deleteMode === note.id && (
+                                <div
+                                    className="absolute top-0 left-0 right-0 bottom-0 bg-red-100/50 backdrop-blur-sm flex items-center justify-center"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <div className="bg-white p-4 rounded shadow-lg">
+                                        <p className="text-red-500 mb-2">Nhập Mã Xóa:</p>
+                                        <input
+                                            type="text"
+                                            value={deleteCode}
+                                            onChange={(e) => setDeleteCode(e.target.value)}
+                                            className="border p-2 w-full mb-2 rounded"
+                                            autoFocus
+                                        />
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    if (deleteCode.trim().toUpperCase() === 'XOA') {
+                                                        handleDeleteNote(note.id);
+                                                    }
+                                                    setDeleteMode(null);
+                                                    setDeleteCode('');
+                                                }}
+                                                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+                                            >
+                                                Xóa
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setDeleteMode(null);
+                                                    setDeleteCode('');
+                                                }}
+                                                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                                            >
+                                                Hủy
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </li>
                     ))
                 )}
