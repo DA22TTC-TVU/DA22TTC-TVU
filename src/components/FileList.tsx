@@ -269,7 +269,7 @@ export default function FileList({
 
     return (
         <div
-            className="flex-1 flex flex-col overflow-hidden bg-gray-50 h-[calc(100vh-84px)]"
+            className="flex-1 flex flex-col overflow-hidden bg-gray-50 min-h-0"
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
             onDragOver={handleDragOver}
@@ -358,10 +358,12 @@ export default function FileList({
             </div>
 
             {/* File Grid/List với khả năng cuộn */}
-            <div className="flex-1 overflow-y-auto px-4 md:px-6 mb-8">
+            <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-8">
                 <div className={`
-                    grid gap-2 py-2 pb-6 max-h-[calc(100vh-200px)]
-                    ${isGridView ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}
+                    grid gap-2 py-2
+                    ${isGridView
+                        ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                        : 'grid-cols-1'}
                 `}>
                     {isLoading ? (
                         [...Array(5)].map((_, index) => (
