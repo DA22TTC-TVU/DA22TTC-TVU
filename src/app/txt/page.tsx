@@ -129,6 +129,18 @@ const NotePage = () => {
         }
     };
 
+    useEffect(() => {
+        if (deleteMode) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [deleteMode]);
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
             <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
@@ -241,8 +253,8 @@ const NotePage = () => {
                                 </div>
 
                                 {deleteMode === note.id && (
-                                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm 
-                                        flex items-center justify-center p-4">
+                                    <div className="fixed inset-0 bg-white/80 backdrop-blur-sm 
+                                        flex items-center justify-center p-4 z-50">
                                         <div className="bg-white p-6 rounded-2xl shadow-lg max-w-sm w-full">
                                             <p className="text-red-500 font-medium mb-4">
                                                 Nhập &quot;XOA&quot; để xác nhận xóa ghi chú
