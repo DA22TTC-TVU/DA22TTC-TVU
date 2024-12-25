@@ -5,7 +5,7 @@ import Sidebar from '../components/Sidebar';
 import FileList from '../components/FileList';
 import { DriveInfo, FileItem } from '../types';
 import { Dialog } from '@headlessui/react'
-
+import { GoogleGenerativeAI } from '@google/generative-ai';
 interface FolderBreadcrumb {
   id: string;
   name: string;
@@ -26,6 +26,7 @@ export default function Home() {
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [currentFolderName, setCurrentFolderName] = useState<string>('');
   const [folderPath, setFolderPath] = useState<FolderBreadcrumb[]>([]);
+  const [isAISearch, setIsAISearch] = useState(false);
 
   const formatBytes = (bytes: number) => {
     if (!bytes) return '0 Bytes';
@@ -331,13 +332,111 @@ export default function Home() {
   };
 
   const handleSearch = async (term: string) => {
+    // Kiểm tra nếu chuỗi chỉ chứa khoảng trắng
+    if (!term.trim()) {
+      // Nếu đang ở chế độ AI và xóa hết nội dung, lấy lại danh sách gốc
+      if (isAISearch) {
+        const response = await fetch('/api/drive');
+        const data = await response.json();
+        setFiles(sortFilesByType(data.files));
+      }
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/drive?q=${encodeURIComponent(term)}`);
-      const data = await response.json();
-      setFiles(sortFilesByType(data.files));
+      if (isAISearch) {
+        // Reset về thư mục gốc khi tìm kiếm
+        setCurrentFolderId(null);
+        setCurrentFolderName('');
+        setFolderPath([]);
+        setFolderHistory([]);
+        // Tìm kiếm bằng AI
+        const keyResponse = await fetch('/api/drive/ai-search');
+        const { apiKey } = await keyResponse.json();
+
+        const allFilesResponse = await fetch('/api/drive/all');
+        const allFilesData = await allFilesResponse.json();
+
+        const simpleFiles = allFilesData.files.map((file: any) => ({
+          id: file.id,
+          name: file.name,
+          mimeType: file.mimeType
+        }));
+
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({
+          model: "gemini-2.0-flash-exp",
+        });
+
+        const generationConfig = {
+          temperature: 1,
+          topP: 0.95,
+          topK: 40,
+          maxOutputTokens: 8192,
+          responseMimeType: "application/json",
+        };
+
+        const chatSession = model.startChat({
+          generationConfig,
+          history: [],
+        });
+
+        const prompt = `
+          Bạn là AI assistant giúp tìm kiếm file và thư mục. Với yêu cầu tìm kiếm: "${term}"
+          Hãy phân tích danh sách và trả về mảng chứa ID của các file/thư mục phù hợp.
+          
+          Lưu ý:
+          - Thư mục có mimeType là "application/vnd.google-apps.folder"
+          - Tìm kiếm dựa trên tên và loại (file/thư mục)
+          - Chỉ trả về mảng JSON chứa các ID, không kèm giải thích
+
+          Ví dụ danh sách files đầu vào:
+          [
+            {
+              "id": "1abc123",
+              "name": "Tài liệu học tập",
+              "mimeType": "application/vnd.google-apps.folder"
+            },
+            {
+              "id": "2xyz456",
+              "name": "báo cáo.docx",
+              "mimeType": "application/vnd.google-docs"
+            }
+          ]
+
+          Ví dụ response cần trả về khi tìm "tài liệu":
+          ["1abc123"]
+
+          Danh sách files cần tìm:
+          ${JSON.stringify(simpleFiles, null, 2)}
+        `;
+
+        const result = await chatSession.sendMessage(prompt);
+        const text = result.response.text();
+
+        try {
+          const fileIds = JSON.parse(text);
+          const filteredFiles = allFilesData.files.filter((file: any) => fileIds.includes(file.id));
+          setFiles(sortFilesByType(filteredFiles));
+        } catch (error) {
+          console.error('Lỗi parse JSON:', error);
+          setFiles([]);
+        }
+      } else {
+        // Reset về thư mục gốc khi tìm kiếm
+        setCurrentFolderId(null);
+        setCurrentFolderName('');
+        setFolderPath([]);
+        setFolderHistory([]);
+        // Tìm kiếm thông thường
+        const response = await fetch(`/api/drive?q=${encodeURIComponent(term)}`);
+        const data = await response.json();
+        setFiles(sortFilesByType(data.files));
+      }
     } catch (error) {
       console.error('Lỗi khi tìm kiếm:', error);
+      setFiles([]);
     } finally {
       setIsLoading(false);
     }
@@ -347,16 +446,43 @@ export default function Home() {
     const value = e.target.value;
     setSearchTerm(value);
 
-    // Debounce search
     if (searchTimeout) {
       clearTimeout(searchTimeout);
     }
 
-    const timeout = setTimeout(() => {
-      handleSearch(value);
-    }, 500);
+    // Nếu chuỗi rỗng hoặc chỉ chứa khoảng trắng
+    if (!value.trim()) {
+      // Reset về danh sách ban đầu
+      const resetSearch = async () => {
+        try {
+          const response = await fetch('/api/drive');
+          const data = await response.json();
+          setFiles(sortFilesByType(data.files));
+          // Reset các state liên quan
+          setCurrentFolderId(null);
+          setCurrentFolderName('');
+          setFolderPath([]);
+          setFolderHistory([]);
+        } catch (error) {
+          console.error('Lỗi khi reset tìm kiếm:', error);
+        }
+      };
+      resetSearch();
+      return;
+    }
 
-    setSearchTimeout(timeout);
+    // Chỉ tự động tìm kiếm khi không phải AI search
+    if (!isAISearch) {
+      const timeout = setTimeout(() => {
+        handleSearch(value);
+      }, 500);
+      setSearchTimeout(timeout);
+    }
+  };
+
+  // Thêm hàm xử lý tìm kiếm riêng
+  const handleSearchClick = () => {
+    handleSearch(searchTerm);
   };
 
   const handleBreadcrumbClick = async (folderId: string, index: number) => {
@@ -498,9 +624,13 @@ export default function Home() {
     }
   };
 
+  const handleToggleAISearch = () => {
+    setIsAISearch(!isAISearch);
+  };
+
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-[1800px] mx-auto">
+    <div className="h-screen flex flex-col overflow-hidden bg-white">
+      <div className="max-w-[1800px] w-full mx-auto flex flex-col flex-1 overflow-hidden">
         <div className="md:hidden p-4">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -515,9 +645,12 @@ export default function Home() {
         <Header
           searchTerm={searchTerm}
           onSearchChange={handleSearchChange}
+          isAISearch={isAISearch}
+          onToggleAISearch={handleToggleAISearch}
+          onSearch={handleSearchClick}
         />
 
-        <div className="flex relative">
+        <div className="flex flex-1 overflow-hidden">
           <Sidebar
             driveInfo={driveInfo}
             onCreateFolder={handleCreateFolder}

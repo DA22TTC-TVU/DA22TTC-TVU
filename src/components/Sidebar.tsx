@@ -38,10 +38,10 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
             )}
 
             <div className={`
-                fixed md:static inset-y-0 left-0 w-72 bg-gradient-to-b from-gray-50 to-white p-4
+                fixed md:sticky top-0 md:top-[84px] h-[calc(100vh-84px)] w-72 bg-gradient-to-b from-gray-50 to-white p-4
                 ${isOpen ? 'translate-x-0' : '-translate-x-full'} 
                 md:translate-x-0 transition-transform duration-300 ease-out
-                z-50 flex flex-col shadow-lg md:shadow-none
+                z-50 flex flex-col shadow-lg md:shadow-none overflow-y-auto
             `}>
                 <div className="flex items-center justify-between mb-6 md:hidden">
                     <h2 className="text-xl font-bold text-gray-800">Menu</h2>
