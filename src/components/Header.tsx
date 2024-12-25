@@ -16,7 +16,7 @@ export default function Header({ searchTerm, onSearchChange, isAISearch, onToggl
     const router = useRouter();
 
     return (
-        <div className="flex flex-col md:flex-row items-center p-5 
+        <div className="flex flex-col md:flex-row items-center p-5 gap-4 md:gap-0 
             border-b border-gray-200 dark:border-gray-700 
             bg-gradient-to-r from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 
             shadow-sm sticky top-0 z-10">
@@ -83,7 +83,7 @@ export default function Header({ searchTerm, onSearchChange, isAISearch, onToggl
                     )}
                 </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 w-full md:w-auto justify-center">
                 <button
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                     className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"

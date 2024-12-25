@@ -2,22 +2,31 @@
 import { useState, useRef, useEffect } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faCopy, faImage } from '@fortawesome/free-solid-svg-icons';
 import { useRouter } from 'next/navigation';
 import { Toaster, toast } from 'react-hot-toast';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
+import TextareaAutosize from 'react-textarea-autosize';
 
 interface Message {
     role: 'user' | 'assistant';
     content: string;
+    imageUrls?: string[];
 }
 
 interface ChatHistory {
     role: 'user' | 'model';
     parts: { text: string }[];
+}
+
+interface ImagePart {
+    inlineData: {
+        data: string;
+        mimeType: string;
+    };
 }
 
 export default function ChatPage() {
@@ -28,6 +37,11 @@ export default function ChatPage() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [model, setModel] = useState<any>(null);
     const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
+    const [streamingText, setStreamingText] = useState('');
+    const streamEndRef = useRef<HTMLDivElement>(null);
+    const [selectedImages, setSelectedImages] = useState<File[]>([]);
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         const initAI = async () => {
@@ -61,43 +75,96 @@ export default function ChatPage() {
     }, [chatHistory]);
 
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+        if (streamingText) {
+            streamEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [messages, streamingText]);
+
+    const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        const validFiles = files.filter(file => file.size <= 5 * 1024 * 1024);
+
+        if (validFiles.length < files.length) {
+            toast.error('Một số ảnh vượt quá giới hạn 5MB');
+        }
+
+        setSelectedImages(prev => [...prev, ...validFiles]);
+
+        validFiles.forEach(file => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreviews(prev => [...prev, reader.result as string]);
+            };
+            reader.readAsDataURL(file);
+        });
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || !model || isLoading) return;
+        if ((!input.trim() && !selectedImages.length) || !model || isLoading) return;
 
         const userMessage = input.trim();
         setInput('');
         setIsLoading(true);
-
-        setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+        setStreamingText('');
 
         try {
-            const newUserHistory: ChatHistory = {
+            let parts = [];
+            let imageUrls: string[] = [];
+
+            if (selectedImages.length > 0 && imagePreviews.length > 0) {
+                imageUrls = [...imagePreviews];
+                for (const preview of imagePreviews) {
+                    const imageData = preview.split(',')[1] || '';
+                    const imagePart: ImagePart = {
+                        inlineData: {
+                            data: imageData,
+                            mimeType: selectedImages[0].type,
+                        }
+                    };
+                    parts.push(imagePart);
+                }
+            }
+
+            if (userMessage) {
+                parts.push(userMessage);
+            }
+
+            setChatHistory(prev => [...prev, {
                 role: 'user',
                 parts: [{ text: userMessage }]
-            };
-            setChatHistory(prev => [...prev, newUserHistory]);
+            }]);
 
-            const result = await model.sendMessage(userMessage);
-            const response = result.response.text();
+            setMessages(prev => [...prev, {
+                role: 'user',
+                content: userMessage,
+                imageUrls: imageUrls
+            }]);
 
-            const newModelHistory: ChatHistory = {
+            handleRemoveImage();
+
+            const result = await model.sendMessageStream(parts);
+            let fullResponse = '';
+
+            for await (const chunk of result.stream) {
+                const chunkText = chunk.text();
+                fullResponse += chunkText;
+                setStreamingText(fullResponse);
+            }
+
+            setChatHistory(prev => [...prev, {
                 role: 'model',
-                parts: [{ text: response }]
-            };
-            setChatHistory(prev => [...prev, newModelHistory]);
+                parts: [{ text: fullResponse }]
+            }]);
 
-            setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+            setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
+            setStreamingText('');
+
         } catch (error) {
             console.error('Lỗi khi gửi tin nhắn:', error);
             toast.error('Lỗi khi gửi tin nhắn');
-            setMessages(prev => [...prev, {
-                role: 'assistant',
-                content: 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại sau.'
-            }]);
         } finally {
             setIsLoading(false);
         }
@@ -105,6 +172,28 @@ export default function ChatPage() {
 
     const handleGoBack = () => {
         router.push('/');
+    };
+
+    const copyToClipboard = async (text: string) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            toast.success('Đã sao chép vào clipboard');
+        } catch (err) {
+            toast.error('Không thể sao chép');
+        }
+    };
+
+    const handleRemoveImage = (index?: number) => {
+        if (typeof index === 'number') {
+            setSelectedImages(prev => prev.filter((_, i) => i !== index));
+            setImagePreviews(prev => prev.filter((_, i) => i !== index));
+        } else {
+            setSelectedImages([]);
+            setImagePreviews([]);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
     };
 
     return (
@@ -131,22 +220,121 @@ export default function ChatPage() {
                     </h1>
                 </div>
 
-                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
-                    <div className="flex-1 overflow-y-auto mb-4 max-h-[600px]">
-                        <div className="space-y-4">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-2 sm:p-4">
+                    <div className="flex-1 overflow-y-auto mb-2 sm:mb-4 h-[calc(100vh-210px)]">
+                        <div className="space-y-2 sm:space-y-4">
                             {messages.map((message, index) => (
                                 <div
                                     key={index}
-                                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} group`}
                                 >
-                                    <div
-                                        className={`max-w-[80%] rounded-xl p-4 ${message.role === 'user'
+                                    <div className={`${message.role === 'user' ? 'ml-auto' : 'mr-auto'} max-w-[85%]`}>
+                                        <div className={`rounded-xl p-2.5 sm:p-4 ${message.role === 'user'
                                             ? 'bg-blue-500 text-white'
                                             : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                                            }`}
-                                    >
+                                            }`}>
+                                            {message.imageUrls && message.imageUrls.length > 0 && (
+                                                <div className="flex flex-wrap gap-2 mb-2">
+                                                    {message.imageUrls.map((url, idx) => (
+                                                        <div key={idx} className="w-40 h-40 sm:w-48 sm:h-48 overflow-hidden rounded-lg">
+                                                            <img
+                                                                src={url}
+                                                                alt={`Uploaded ${idx + 1}`}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <ReactMarkdown
+                                                className="prose dark:prose-invert max-w-none text-sm sm:text-base break-words"
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    code({ inline, className, children, ...props }: {
+                                                        inline?: boolean;
+                                                        className?: string;
+                                                        children?: React.ReactNode;
+                                                    }) {
+                                                        const match = /language-(\w+)/.exec(className || '');
+                                                        return !inline && match ? (
+                                                            <div className="relative">
+                                                                <button
+                                                                    onClick={() => copyToClipboard(String(children))}
+                                                                    className="absolute -top-2 -right-2 p-2 bg-gray-700 rounded-lg 
+                                                                    hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm z-10"
+                                                                >
+                                                                    <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-4 h-4" />
+                                                                </button>
+                                                                <SyntaxHighlighter
+                                                                    {...props}
+                                                                    style={atomDark}
+                                                                    language={match[1]}
+                                                                    PreTag="div"
+                                                                    className="rounded-lg"
+                                                                >
+                                                                    {String(children).replace(/\n$/, '')}
+                                                                </SyntaxHighlighter>
+                                                            </div>
+                                                        ) : (
+                                                            <code {...props} className={className}>
+                                                                {children}
+                                                            </code>
+                                                        );
+                                                    },
+                                                    // Tùy chỉnh các thẻ markdown khác
+                                                    p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
+                                                    ul: ({ children }) => <ul className="list-disc pl-4 mb-4 last:mb-0">{children}</ul>,
+                                                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-4 last:mb-0">{children}</ol>,
+                                                    li: ({ children }) => <li className="mb-1">{children}</li>,
+                                                    a: ({ children, href }) => (
+                                                        <a
+                                                            href={href}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-blue-400 hover:text-blue-500 underline"
+                                                        >
+                                                            {children}
+                                                        </a>
+                                                    ),
+                                                    blockquote: ({ children }) => (
+                                                        <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic">
+                                                            {children}
+                                                        </blockquote>
+                                                    ),
+                                                }}
+                                            >
+                                                {message.content}
+                                            </ReactMarkdown>
+                                        </div>
+                                        <div className={`flex mt-1 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            <button
+                                                onClick={() => copyToClipboard(message.content)}
+                                                className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
+                                                hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                            >
+                                                <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            {isLoading && !streamingText && (
+                                <div className="flex justify-start">
+                                    <div className="bg-gray-100 dark:bg-gray-700 rounded-xl p-4">
+                                        <div className="flex space-x-2">
+                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            <div ref={messagesEndRef} />
+                            {streamingText && (
+                                <div className="flex justify-start">
+                                    <div className="bg-gray-100 dark:bg-gray-700 rounded-xl p-4 max-w-[85%]">
                                         <ReactMarkdown
-                                            className="prose dark:prose-invert max-w-none"
+                                            className="prose dark:prose-invert max-w-none text-sm sm:text-base break-words"
                                             remarkPlugins={[remarkGfm]}
                                             components={{
                                                 code({ inline, className, children, ...props }: {
@@ -156,15 +344,24 @@ export default function ChatPage() {
                                                 }) {
                                                     const match = /language-(\w+)/.exec(className || '');
                                                     return !inline && match ? (
-                                                        <SyntaxHighlighter
-                                                            {...props}
-                                                            style={atomDark}
-                                                            language={match[1]}
-                                                            PreTag="div"
-                                                            className="rounded-lg"
-                                                        >
-                                                            {String(children).replace(/\n$/, '')}
-                                                        </SyntaxHighlighter>
+                                                        <div className="relative">
+                                                            <button
+                                                                onClick={() => copyToClipboard(String(children))}
+                                                                className="absolute -top-2 -right-2 p-2 bg-gray-700 rounded-lg 
+                                                                hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm z-10"
+                                                            >
+                                                                <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-4 h-4" />
+                                                            </button>
+                                                            <SyntaxHighlighter
+                                                                {...props}
+                                                                style={atomDark}
+                                                                language={match[1]}
+                                                                PreTag="div"
+                                                                className="rounded-lg"
+                                                            >
+                                                                {String(children).replace(/\n$/, '')}
+                                                            </SyntaxHighlighter>
+                                                        </div>
                                                     ) : (
                                                         <code {...props} className={className}>
                                                             {children}
@@ -172,7 +369,11 @@ export default function ChatPage() {
                                                     );
                                                 },
                                                 // Tùy chỉnh các thẻ markdown khác
-                                                p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
+                                                p: ({ children }) => (
+                                                    <p className="mb-4 last:mb-0">
+                                                        {String(children).replace(/\.\.\.$/, '')}
+                                                    </p>
+                                                ),
                                                 ul: ({ children }) => <ul className="list-disc pl-4 mb-4 last:mb-0">{children}</ul>,
                                                 ol: ({ children }) => <ol className="list-decimal pl-4 mb-4 last:mb-0">{children}</ol>,
                                                 li: ({ children }) => <li className="mb-1">{children}</li>,
@@ -193,52 +394,131 @@ export default function ChatPage() {
                                                 ),
                                             }}
                                         >
-                                            {message.content}
+                                            {streamingText.replace(/\.\.\.$/, '')}
                                         </ReactMarkdown>
-                                    </div>
-                                </div>
-                            ))}
-                            {isLoading && (
-                                <div className="flex justify-start">
-                                    <div className="bg-gray-100 dark:bg-gray-700 rounded-xl p-4">
-                                        <div className="flex space-x-2">
-                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
-                                        </div>
+                                        <div ref={streamEndRef} />
                                     </div>
                                 </div>
                             )}
-                            <div ref={messagesEndRef} />
                         </div>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="flex space-x-4">
-                        <input
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            placeholder="Nhập tin nhắn của bạn..."
-                            className="flex-1 px-4 py-3 
-                            bg-gray-50 dark:bg-gray-700 
-                            border border-gray-200 dark:border-gray-700
-                            rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500
-                            text-gray-900 dark:text-white
-                            placeholder-gray-400 dark:placeholder-gray-500"
-                            disabled={isLoading}
-                        />
-                        <button
-                            type="submit"
-                            disabled={isLoading || !input.trim()}
-                            className="px-6 py-3 
-                            bg-gradient-to-r from-blue-500 to-indigo-500 
-                            text-white font-medium rounded-xl
-                            hover:from-blue-600 hover:to-indigo-600 
-                            disabled:opacity-50 disabled:cursor-not-allowed
-                            transform active:scale-[0.98] transition-all duration-200"
-                        >
-                            Gửi
-                        </button>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {imagePreviews.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                                {imagePreviews.map((preview, index) => (
+                                    <div key={index} className="relative inline-block">
+                                        <div className="relative w-40 h-40 sm:w-48 sm:h-48 overflow-hidden rounded-2xl
+                                            border-2 border-gray-200 dark:border-gray-700
+                                            bg-gray-50 dark:bg-gray-800
+                                            shadow-sm hover:shadow-md transition-all duration-200"
+                                        >
+                                            <img
+                                                src={preview}
+                                                alt={`Preview ${index + 1}`}
+                                                className="w-full h-full object-cover"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveImage(index)}
+                                                className="absolute top-2 right-2 
+                                                    p-1.5 rounded-full
+                                                    bg-red-500 hover:bg-red-600 
+                                                    text-white shadow-lg
+                                                    transform hover:scale-105 
+                                                    transition-all duration-200"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="flex space-x-2">
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleImageSelect}
+                                accept="image/*"
+                                multiple
+                                className="hidden"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="p-2.5 
+                                    min-h-[42px] min-w-[42px]
+                                    flex items-center justify-center
+                                    bg-gray-100 hover:bg-gray-200 
+                                    dark:bg-gray-700 dark:hover:bg-gray-600 
+                                    text-gray-600 dark:text-gray-300
+                                    rounded-xl border border-gray-200 dark:border-gray-600
+                                    transition-all duration-200
+                                    group relative"
+                                title="Tải ảnh lên"
+                            >
+                                <FontAwesomeIcon
+                                    icon={faImage}
+                                    className="w-5 h-5 transform group-hover:scale-110 transition-transform"
+                                />
+                                {/* Tooltip */}
+                                <span className="absolute -top-10 left-1/2 -translate-x-1/2 
+                                    px-2 py-1 rounded-lg text-xs font-medium
+                                    bg-gray-800 dark:bg-gray-700 text-white
+                                    opacity-0 group-hover:opacity-100
+                                    transition-opacity duration-200
+                                    whitespace-nowrap
+                                    z-10"
+                                >
+                                    Tải ảnh lên
+                                </span>
+                            </button>
+
+                            <TextareaAutosize
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSubmit(e);
+                                    }
+                                }}
+                                placeholder="Nhập tin nhắn..."
+                                className="flex-1 px-3 py-2.5 
+                                    text-sm sm:text-base 
+                                    bg-gray-50 dark:bg-gray-700 
+                                    border border-gray-200 dark:border-gray-600
+                                    rounded-xl 
+                                    focus:outline-none focus:ring-2 focus:ring-blue-500
+                                    text-gray-900 dark:text-white
+                                    placeholder-gray-400 dark:placeholder-gray-500
+                                    resize-none min-h-[42px]
+                                    transition-all duration-200"
+                                disabled={isLoading}
+                                minRows={1}
+                                maxRows={5}
+                            />
+
+                            <button
+                                type="submit"
+                                disabled={isLoading || (!input.trim() && !selectedImages.length)}
+                                className="px-4 py-2.5 
+                                    min-h-[42px]
+                                    text-sm sm:text-base 
+                                    bg-gradient-to-r from-blue-500 to-indigo-500 
+                                    text-white font-medium rounded-xl
+                                    hover:from-blue-600 hover:to-indigo-600 
+                                    disabled:opacity-50 disabled:cursor-not-allowed
+                                    transform active:scale-[0.98] 
+                                    transition-all duration-200"
+                            >
+                                Gửi
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
