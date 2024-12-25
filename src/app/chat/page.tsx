@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faCopy, faImage, faFileUpload } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faCopy, faImage, faFileUpload, faCompress, faExpand, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { useRouter } from 'next/navigation';
 import { Toaster, toast } from 'react-hot-toast';
 import ReactMarkdown from 'react-markdown';
@@ -46,6 +46,13 @@ const SUPPORTED_FILE_TYPES = [
     'text/rtf'
 ];
 
+// Thêm interface cho modal
+interface CodePreviewModal {
+    isOpen: boolean;
+    content: string;
+    isFullscreen: boolean;
+}
+
 export default function ChatPage() {
     const router = useRouter();
     const [messages, setMessages] = useState<Message[]>([]);
@@ -62,6 +69,22 @@ export default function ChatPage() {
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [filePreviews, setFilePreviews] = useState<{ name: string, type: string }[]>([]);
     const documentInputRef = useRef<HTMLInputElement>(null);
+    const [codePreview, setCodePreview] = useState<CodePreviewModal>({
+        isOpen: false,
+        content: '',
+        isFullscreen: false
+    });
+
+    const suggestionMessages = [
+        "Hướng dẫn cách viết một REST API đơn giản với Node.js",
+        "Đề xuất ý tưởng thiết kế giao diện cho ứng dụng học trực tuyến",
+        "Tóm tắt nội dung chính của một bài báo khoa học",
+        "Phân tích ưu nhược điểm của các framework JavaScript phổ biến"
+    ];
+
+    const handleSuggestionClick = (message: string) => {
+        setInput(message);
+    };
 
     useEffect(() => {
         const initAI = async () => {
@@ -308,6 +331,30 @@ export default function ChatPage() {
         };
     }, []);
 
+    // Thêm hàm để mở/đóng modal
+    const handleCodePreview = (code: string) => {
+        setCodePreview({
+            isOpen: true,
+            content: code,
+            isFullscreen: false
+        });
+    };
+
+    const closeCodePreview = () => {
+        setCodePreview({
+            isOpen: false,
+            content: '',
+            isFullscreen: false
+        });
+    };
+
+    const toggleFullscreen = () => {
+        setCodePreview(prev => ({
+            ...prev,
+            isFullscreen: !prev.isFullscreen
+        }));
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
             <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
@@ -334,219 +381,267 @@ export default function ChatPage() {
 
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-2 sm:p-4">
                     <div className="flex-1 overflow-y-auto mb-2 sm:mb-4 h-[calc(100vh-210px)]">
-                        <div className="space-y-2 sm:space-y-4">
-                            {messages.map((message, index) => (
-                                <div
-                                    key={index}
-                                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} group`}
-                                >
-                                    <div className={`${message.role === 'user' ? 'ml-auto' : 'mr-auto'} max-w-[85%]`}>
-                                        <div className={`rounded-xl p-2.5 sm:p-4 ${message.role === 'user'
-                                            ? 'bg-blue-500 text-white'
-                                            : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                                            }`}>
-                                            {message.files && message.files.length > 0 && (
-                                                <div className="flex flex-wrap gap-2 mb-2">
-                                                    {message.files.map((file, idx) => (
-                                                        <div
-                                                            key={idx}
-                                                            className="flex items-center gap-2 px-3 py-2 
-                                                                bg-gray-50/10 dark:bg-gray-600/30
-                                                                border border-gray-200/20 dark:border-gray-600/30
-                                                                rounded-lg"
-                                                        >
-                                                            <svg
-                                                                className="w-5 h-5 text-current opacity-70"
-                                                                fill="none"
-                                                                stroke="currentColor"
-                                                                viewBox="0 0 24 24"
-                                                            >
-                                                                <path
-                                                                    strokeLinecap="round"
-                                                                    strokeLinejoin="round"
-                                                                    strokeWidth={2}
-                                                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                                                />
-                                                            </svg>
-                                                            <span className="text-sm opacity-90 truncate max-w-[150px]">
-                                                                {file.name}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {message.imageUrls && message.imageUrls.length > 0 && (
-                                                <div className="flex flex-wrap gap-2 mb-2">
-                                                    {message.imageUrls.map((url, idx) => (
-                                                        <div key={idx} className="w-40 h-40 sm:w-48 sm:h-48 overflow-hidden rounded-lg">
-                                                            <img
-                                                                src={url}
-                                                                alt={`Uploaded ${idx + 1}`}
-                                                                className="w-full h-full object-cover"
-                                                            />
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {message.content && (
-                                                <ReactMarkdown
-                                                    className="prose dark:prose-invert max-w-none text-sm sm:text-base break-words"
-                                                    remarkPlugins={[remarkGfm]}
-                                                    components={{
-                                                        code({ inline, className, children, ...props }: {
-                                                            inline?: boolean;
-                                                            className?: string;
-                                                            children?: React.ReactNode;
-                                                        }) {
-                                                            const match = /language-(\w+)/.exec(className || '');
-                                                            return !inline && match ? (
-                                                                <div className="relative">
-                                                                    <button
-                                                                        onClick={() => copyToClipboard(String(children))}
-                                                                        className="absolute -top-2 -right-2 p-2 bg-gray-700 rounded-lg 
-                                                                        hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm z-10"
-                                                                    >
-                                                                        <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-4 h-4" />
-                                                                    </button>
-                                                                    <SyntaxHighlighter
-                                                                        {...props}
-                                                                        style={atomDark}
-                                                                        language={match[1]}
-                                                                        PreTag="div"
-                                                                        className="rounded-lg"
-                                                                    >
-                                                                        {String(children).replace(/\n$/, '')}
-                                                                    </SyntaxHighlighter>
-                                                                </div>
-                                                            ) : (
-                                                                <code {...props} className={className}>
-                                                                    {children}
-                                                                </code>
-                                                            );
-                                                        },
-                                                        // Tùy chỉnh các thẻ markdown khác
-                                                        p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
-                                                        ul: ({ children }) => <ul className="list-disc pl-4 mb-4 last:mb-0">{children}</ul>,
-                                                        ol: ({ children }) => <ol className="list-decimal pl-4 mb-4 last:mb-0">{children}</ol>,
-                                                        li: ({ children }) => <li className="mb-1">{children}</li>,
-                                                        a: ({ children, href }) => (
-                                                            <a
-                                                                href={href}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="text-blue-400 hover:text-blue-500 underline"
-                                                            >
-                                                                {children}
-                                                            </a>
-                                                        ),
-                                                        blockquote: ({ children }) => (
-                                                            <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic">
-                                                                {children}
-                                                            </blockquote>
-                                                        ),
-                                                    }}
-                                                >
-                                                    {message.content}
-                                                </ReactMarkdown>
-                                            )}
-                                        </div>
-                                        <div className={`flex mt-1 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        {messages.length === 0 ? (
+                            <div className="h-full flex items-center justify-center p-4">
+                                <div className="text-center space-y-4 sm:space-y-6 w-full max-w-2xl mx-auto">
+                                    <h2 className="text-xl sm:text-2xl font-bold text-gray-700 dark:text-gray-200">
+                                        Bắt đầu cuộc trò chuyện với AI
+                                    </h2>
+                                    <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
+                                        Chọn một câu hỏi mẫu hoặc nhập câu hỏi của bạn
+                                    </p>
+                                    <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2">
+                                        {suggestionMessages.map((message, index) => (
                                             <button
-                                                onClick={() => copyToClipboard(message.content)}
-                                                className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
-                                                    hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                                key={index}
+                                                onClick={() => handleSuggestionClick(message)}
+                                                className="p-3 sm:p-4 text-left
+                                                    bg-gray-50 dark:bg-gray-700
+                                                    hover:bg-gray-100 dark:hover:bg-gray-600
+                                                    border border-gray-200 dark:border-gray-600
+                                                    rounded-xl
+                                                    transition-all duration-200
+                                                    group"
                                             >
-                                                <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-3 h-3" />
+                                                <p className="text-xs sm:text-sm md:text-base text-gray-600 dark:text-gray-300
+                                                    group-hover:text-gray-900 dark:group-hover:text-white
+                                                    line-clamp-2 sm:line-clamp-none">
+                                                    {message}
+                                                </p>
                                             </button>
-                                        </div>
+                                        ))}
                                     </div>
                                 </div>
-                            ))}
-                            {isLoading && !streamingText && (
-                                <div className="flex justify-start">
-                                    <div className="bg-gray-100 dark:bg-gray-700 rounded-xl p-4">
-                                        <div className="flex space-x-2">
-                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                            <div ref={messagesEndRef} />
-                            {streamingText && (
-                                <div className="flex justify-start">
-                                    <div className="bg-gray-100 dark:bg-gray-700 rounded-xl p-4 max-w-[85%]">
-                                        <ReactMarkdown
-                                            className="prose dark:prose-invert max-w-none text-sm sm:text-base break-words"
-                                            remarkPlugins={[remarkGfm]}
-                                            components={{
-                                                code({ inline, className, children, ...props }: {
-                                                    inline?: boolean;
-                                                    className?: string;
-                                                    children?: React.ReactNode;
-                                                }) {
-                                                    const match = /language-(\w+)/.exec(className || '');
-                                                    return !inline && match ? (
-                                                        <div className="relative">
-                                                            <button
-                                                                onClick={() => copyToClipboard(String(children))}
-                                                                className="absolute -top-2 -right-2 p-2 bg-gray-700 rounded-lg 
-                                                                hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm z-10"
+                            </div>
+                        ) : (
+                            <div className="space-y-2 sm:space-y-4">
+                                {messages.map((message, index) => (
+                                    <div
+                                        key={index}
+                                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} group`}
+                                    >
+                                        <div className={`${message.role === 'user' ? 'ml-auto' : 'mr-auto'} max-w-[85%]`}>
+                                            <div className={`rounded-xl p-2.5 sm:p-4 ${message.role === 'user'
+                                                ? 'bg-blue-500 text-white'
+                                                : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                                                }`}>
+                                                {message.files && message.files.length > 0 && (
+                                                    <div className="flex flex-wrap gap-2 mb-2">
+                                                        {message.files.map((file, idx) => (
+                                                            <div
+                                                                key={idx}
+                                                                className="flex items-center gap-2 px-3 py-2 
+                                                                    bg-gray-50/10 dark:bg-gray-600/30
+                                                                    border border-gray-200/20 dark:border-gray-600/30
+                                                                    rounded-lg"
                                                             >
-                                                                <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-4 h-4" />
-                                                            </button>
-                                                            <SyntaxHighlighter
-                                                                {...props}
-                                                                style={atomDark}
-                                                                language={match[1]}
-                                                                PreTag="div"
-                                                                className="rounded-lg"
-                                                            >
-                                                                {String(children).replace(/\n$/, '')}
-                                                            </SyntaxHighlighter>
-                                                        </div>
-                                                    ) : (
-                                                        <code {...props} className={className}>
-                                                            {children}
-                                                        </code>
-                                                    );
-                                                },
-                                                // Tùy chỉnh các thẻ markdown khác
-                                                p: ({ children }) => (
-                                                    <p className="mb-4 last:mb-0">
-                                                        {String(children).replace(/\.\.\.$/, '')}
-                                                    </p>
-                                                ),
-                                                ul: ({ children }) => <ul className="list-disc pl-4 mb-4 last:mb-0">{children}</ul>,
-                                                ol: ({ children }) => <ol className="list-decimal pl-4 mb-4 last:mb-0">{children}</ol>,
-                                                li: ({ children }) => <li className="mb-1">{children}</li>,
-                                                a: ({ children, href }) => (
-                                                    <a
-                                                        href={href}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-400 hover:text-blue-500 underline"
+                                                                <svg
+                                                                    className="w-5 h-5 text-current opacity-70"
+                                                                    fill="none"
+                                                                    stroke="currentColor"
+                                                                    viewBox="0 0 24 24"
+                                                                >
+                                                                    <path
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                        strokeWidth={2}
+                                                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                                                    />
+                                                                </svg>
+                                                                <span className="text-sm opacity-90 truncate max-w-[150px]">
+                                                                    {file.name}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {message.imageUrls && message.imageUrls.length > 0 && (
+                                                    <div className="flex flex-wrap gap-2 mb-2">
+                                                        {message.imageUrls.map((url, idx) => (
+                                                            <div key={idx} className="w-40 h-40 sm:w-48 sm:h-48 overflow-hidden rounded-lg">
+                                                                <img
+                                                                    src={url}
+                                                                    alt={`Uploaded ${idx + 1}`}
+                                                                    className="w-full h-full object-cover"
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {message.content && (
+                                                    <ReactMarkdown
+                                                        className="prose dark:prose-invert max-w-none text-sm sm:text-base break-words"
+                                                        remarkPlugins={[remarkGfm]}
+                                                        components={{
+                                                            code({ inline, className, children, ...props }: {
+                                                                inline?: boolean;
+                                                                className?: string;
+                                                                children?: React.ReactNode;
+                                                            }) {
+                                                                const match = /language-(\w+)/.exec(className || '');
+                                                                return !inline && match ? (
+                                                                    <div className="relative">
+                                                                        <div className="absolute -top-2 right-0 flex gap-2 z-10">
+                                                                            {match[1] === 'html' && (
+                                                                                <button
+                                                                                    onClick={() => handleCodePreview(String(children))}
+                                                                                    className="p-2 bg-gray-700 rounded-lg 
+                                                                                    hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm"
+                                                                                >
+                                                                                    <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                                    </svg>
+                                                                                </button>
+                                                                            )}
+                                                                            <button
+                                                                                onClick={() => copyToClipboard(String(children))}
+                                                                                className="p-2 bg-gray-700 rounded-lg 
+                                                                                hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm"
+                                                                            >
+                                                                                <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-4 h-4" />
+                                                                            </button>
+                                                                        </div>
+                                                                        <SyntaxHighlighter
+                                                                            {...props}
+                                                                            style={atomDark}
+                                                                            language={match[1]}
+                                                                            PreTag="div"
+                                                                            className="rounded-lg"
+                                                                        >
+                                                                            {String(children).replace(/\n$/, '')}
+                                                                        </SyntaxHighlighter>
+                                                                    </div>
+                                                                ) : (
+                                                                    <code {...props} className={className}>
+                                                                        {children}
+                                                                    </code>
+                                                                );
+                                                            },
+                                                            // Tùy chỉnh các thẻ markdown khác
+                                                            p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
+                                                            ul: ({ children }) => <ul className="list-disc pl-4 mb-4 last:mb-0">{children}</ul>,
+                                                            ol: ({ children }) => <ol className="list-decimal pl-4 mb-4 last:mb-0">{children}</ol>,
+                                                            li: ({ children }) => <li className="mb-1">{children}</li>,
+                                                            a: ({ children, href }) => (
+                                                                <a
+                                                                    href={href}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-blue-400 hover:text-blue-500 underline"
+                                                                >
+                                                                    {children}
+                                                                </a>
+                                                            ),
+                                                            blockquote: ({ children }) => (
+                                                                <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic">
+                                                                    {children}
+                                                                </blockquote>
+                                                            ),
+                                                        }}
                                                     >
-                                                        {children}
-                                                    </a>
-                                                ),
-                                                blockquote: ({ children }) => (
-                                                    <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic">
-                                                        {children}
-                                                    </blockquote>
-                                                ),
-                                            }}
-                                        >
-                                            {streamingText.replace(/\.\.\.$/, '')}
-                                        </ReactMarkdown>
-                                        <div ref={streamEndRef} />
+                                                        {message.content}
+                                                    </ReactMarkdown>
+                                                )}
+                                            </div>
+                                            <div className={`flex mt-1 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                                <button
+                                                    onClick={() => copyToClipboard(message.content)}
+                                                    className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
+                                                        hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                                >
+                                                    <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            )}
-                        </div>
+                                ))}
+                                {isLoading && !streamingText && (
+                                    <div className="flex justify-start">
+                                        <div className="bg-gray-100 dark:bg-gray-700 rounded-xl p-4">
+                                            <div className="flex space-x-2">
+                                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                <div ref={messagesEndRef} />
+                                {streamingText && (
+                                    <div className="flex justify-start">
+                                        <div className="bg-gray-100 dark:bg-gray-700 rounded-xl p-4 max-w-[85%]">
+                                            <ReactMarkdown
+                                                className="prose dark:prose-invert max-w-none text-sm sm:text-base break-words"
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    code({ inline, className, children, ...props }: {
+                                                        inline?: boolean;
+                                                        className?: string;
+                                                        children?: React.ReactNode;
+                                                    }) {
+                                                        const match = /language-(\w+)/.exec(className || '');
+                                                        return !inline && match ? (
+                                                            <div className="relative">
+                                                                <button
+                                                                    onClick={() => copyToClipboard(String(children))}
+                                                                    className="absolute -top-2 -right-2 p-2 bg-gray-700 rounded-lg 
+                                                                    hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm z-10"
+                                                                >
+                                                                    <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-4 h-4" />
+                                                                </button>
+                                                                <SyntaxHighlighter
+                                                                    {...props}
+                                                                    style={atomDark}
+                                                                    language={match[1]}
+                                                                    PreTag="div"
+                                                                    className="rounded-lg"
+                                                                >
+                                                                    {String(children).replace(/\n$/, '')}
+                                                                </SyntaxHighlighter>
+                                                            </div>
+                                                        ) : (
+                                                            <code {...props} className={className}>
+                                                                {children}
+                                                            </code>
+                                                        );
+                                                    },
+                                                    // Tùy chỉnh các thẻ markdown khác
+                                                    p: ({ children }) => (
+                                                        <p className="mb-4 last:mb-0">
+                                                            {String(children).replace(/\.\.\.$/, '')}
+                                                        </p>
+                                                    ),
+                                                    ul: ({ children }) => <ul className="list-disc pl-4 mb-4 last:mb-0">{children}</ul>,
+                                                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-4 last:mb-0">{children}</ol>,
+                                                    li: ({ children }) => <li className="mb-1">{children}</li>,
+                                                    a: ({ children, href }) => (
+                                                        <a
+                                                            href={href}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-blue-400 hover:text-blue-500 underline"
+                                                        >
+                                                            {children}
+                                                        </a>
+                                                    ),
+                                                    blockquote: ({ children }) => (
+                                                        <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic">
+                                                            {children}
+                                                        </blockquote>
+                                                    ),
+                                                }}
+                                            >
+                                                {streamingText.replace(/\.\.\.$/, '')}
+                                            </ReactMarkdown>
+                                            <div ref={streamEndRef} />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
@@ -815,6 +910,57 @@ export default function ChatPage() {
                     </form>
                 </div>
             </div>
+
+            {/* Code Preview Modal */}
+            {codePreview.isOpen && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+                            <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
+                        </div>
+
+                        <div className={`inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all 
+                            ${codePreview.isFullscreen ? 'fixed inset-0 w-full h-full rounded-none' : 'sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full'}`}>
+                            <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                                    Xem trước HTML
+                                </h3>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={toggleFullscreen}
+                                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                        title={codePreview.isFullscreen ? "Thu nhỏ" : "Toàn màn hình"}
+                                    >
+                                        <FontAwesomeIcon
+                                            icon={codePreview.isFullscreen ? faCompress : faExpand}
+                                            className="w-4 h-4 text-gray-500 dark:text-gray-400"
+                                        />
+                                    </button>
+                                    <button
+                                        onClick={closeCodePreview}
+                                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                        title="Đóng"
+                                    >
+                                        <FontAwesomeIcon
+                                            icon={faTimes}
+                                            className="w-4 h-4 text-gray-500 dark:text-gray-400"
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className={`${codePreview.isFullscreen ? 'h-[calc(100vh-56px)]' : 'h-[80vh]'} overflow-auto`}>
+                                <iframe
+                                    srcDoc={codePreview.content}
+                                    className="w-full h-full"
+                                    title="HTML Preview"
+                                    sandbox="allow-scripts"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <Toaster />
         </div>
     );
