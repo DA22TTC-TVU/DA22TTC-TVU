@@ -629,12 +629,12 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-white">
+    <div className="h-screen flex flex-col overflow-hidden bg-white dark:bg-gray-900">
       <div className="max-w-[1800px] w-full mx-auto flex flex-col flex-1 overflow-hidden">
         <div className="md:hidden p-4">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 hover:bg-gray-100 rounded-lg"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-700 dark:text-gray-200"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -687,11 +687,11 @@ export default function Home() {
         onClose={() => !isCreatingFolder && setIsCreateFolderModalOpen(false)}
         className="relative z-50"
       >
-        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 bg-black/30 dark:bg-black/50" aria-hidden="true" />
 
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="mx-auto max-w-sm rounded-lg bg-white p-6 shadow-xl">
-            <Dialog.Title className="text-lg font-medium mb-4">
+          <Dialog.Panel className="mx-auto max-w-sm rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl">
+            <Dialog.Title className="text-lg font-medium mb-4 text-gray-900 dark:text-white">
               Tạo thư mục mới
             </Dialog.Title>
 
@@ -701,7 +701,9 @@ export default function Home() {
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
                 placeholder="Nhập tên thư mục"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 
+                bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={isCreatingFolder}
               />
 
@@ -709,14 +711,18 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => !isCreatingFolder && setIsCreateFolderModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 
+                  bg-gray-100 dark:bg-gray-700 rounded-md 
+                  hover:bg-gray-200 dark:hover:bg-gray-600"
                   disabled={isCreatingFolder}
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-white 
+                  bg-blue-500 rounded-md hover:bg-blue-600 
+                  disabled:opacity-50"
                   disabled={isCreatingFolder || !newFolderName.trim()}
                 >
                   {isCreatingFolder ? 'Đang tạo...' : 'Tạo thư mục'}

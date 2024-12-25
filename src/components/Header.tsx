@@ -1,6 +1,7 @@
 'use client'
 import React from 'react';
 import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes'
 
 interface HeaderProps {
     searchTerm: string;
@@ -11,10 +12,14 @@ interface HeaderProps {
 }
 
 export default function Header({ searchTerm, onSearchChange, isAISearch, onToggleAISearch, onSearch }: HeaderProps) {
+    const { theme, setTheme } = useTheme();
     const router = useRouter();
 
     return (
-        <div className="flex flex-col md:flex-row items-center p-5 border-b bg-gradient-to-r from-white to-gray-50 shadow-sm sticky top-0 z-10">
+        <div className="flex flex-col md:flex-row items-center p-5 
+            border-b border-gray-200 dark:border-gray-700 
+            bg-gradient-to-r from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 
+            shadow-sm sticky top-0 z-10">
             <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 mb-4 md:mb-0">
                 DA22TTC-TVU
             </h1>
@@ -25,9 +30,13 @@ export default function Header({ searchTerm, onSearchChange, isAISearch, onToggl
                         value={searchTerm}
                         onChange={onSearchChange}
                         placeholder={isAISearch ? "Tìm kiếm bằng AI..." : "Tìm kiếm tài liệu"}
-                        className={`w-full px-12 ${isAISearch ? 'pr-24' : 'pr-12'} py-3.5 bg-white border border-gray-200 rounded-xl outline-none 
-                        hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 
-                        transition-all duration-200`}
+                        className="w-full px-12 py-3.5 bg-white dark:bg-gray-700 
+                        border border-gray-200 dark:border-gray-600 
+                        text-gray-900 dark:text-white
+                        rounded-xl outline-none 
+                        hover:border-blue-400 focus:border-blue-500 
+                        focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 
+                        transition-all duration-200"
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && !isAISearch) {
                                 onSearch();
@@ -43,9 +52,11 @@ export default function Header({ searchTerm, onSearchChange, isAISearch, onToggl
 
                     <button
                         onClick={onToggleAISearch}
-                        className={`absolute ${isAISearch ? 'right-[4.5rem]' : 'right-4'} top-1/2 -translate-y-1/2 p-1.5 rounded-lg
-                        transition-all duration-200 hover:bg-gray-100
-                        ${isAISearch ? 'text-blue-500' : 'text-gray-400'}`}
+                        className={`absolute ${isAISearch ? 'right-[4.5rem]' : 'right-4'} 
+                        top-1/2 -translate-y-1/2 p-1.5 rounded-lg
+                        transition-all duration-200 
+                        hover:bg-gray-100 dark:hover:bg-gray-600
+                        ${isAISearch ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}
                         title={isAISearch ? "Đang dùng AI" : "Chuyển sang tìm kiếm AI"}
                     >
                         <svg
@@ -72,14 +83,36 @@ export default function Header({ searchTerm, onSearchChange, isAISearch, onToggl
                     )}
                 </div>
             </div>
-            <button
-                className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-2.5 rounded-xl
-                hover:from-blue-600 hover:to-indigo-600 active:scale-95 shadow-md hover:shadow-lg
-                transition-all duration-200 font-medium mt-4 md:mt-0"
-                onClick={() => router.push('/txt')}
-            >
-                Ghi chú
-            </button>
+            <div className="flex items-center gap-4">
+                <button
+                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    title={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
+                >
+                    {theme === 'dark' ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+                            />
+                        </svg>
+                    ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                            />
+                        </svg>
+                    )}
+                </button>
+
+                <button
+                    className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-2.5 rounded-xl
+                    hover:from-blue-600 hover:to-indigo-600 active:scale-95 shadow-md hover:shadow-lg
+                    transition-all duration-200 font-medium mt-4 md:mt-0"
+                    onClick={() => router.push('/txt')}
+                >
+                    Ghi chú
+                </button>
+            </div>
         </div>
     );
 } 

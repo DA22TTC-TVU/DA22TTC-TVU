@@ -38,21 +38,25 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
             )}
 
             <div className={`
-                fixed md:sticky top-0 md:top-[84px] w-72 bg-gradient-to-b from-gray-50 to-white p-4
-                ${isOpen ? 'translate-x-0' : '-translate-x-full'} 
+                fixed md:sticky top-0 md:top-[84px] w-72 
+                bg-gradient-to-b from-gray-50 to-white 
+                dark:from-gray-800 dark:to-gray-900
+                p-4 ${isOpen ? 'translate-x-0' : '-translate-x-full'} 
                 md:translate-x-0 transition-transform duration-300 ease-out
                 z-50 flex flex-col shadow-lg md:shadow-none
-                
                 h-[100vh] md:h-[calc(100vh-84px)]
                 overflow-y-auto
             `}>
                 <div className="flex items-center justify-between mb-6 md:hidden">
-                    <h2 className="text-xl font-bold text-gray-800">Menu</h2>
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Menu</h2>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 
+                        text-gray-600 dark:text-gray-400
+                        hover:text-gray-900 dark:hover:text-gray-100
+                        rounded-xl transition-colors"
                     >
-                        <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
@@ -60,8 +64,11 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
 
                 <button
                     onClick={handleCreateFolder}
-                    className="flex items-center space-x-3 px-6 py-3.5 rounded-xl bg-blue-50 hover:bg-blue-100
-                    text-blue-600 font-medium transition-all duration-200 mb-4 group"
+                    className="flex items-center space-x-3 px-6 py-3.5 rounded-xl 
+                    bg-blue-50 dark:bg-blue-900/30 
+                    text-blue-600 dark:text-blue-400 
+                    hover:bg-blue-100 dark:hover:bg-blue-900/50
+                    font-medium transition-all duration-200 mb-4 group"
                 >
                     <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -72,8 +79,11 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
                 <div className="space-y-3">
                     <label
                         htmlFor="fileInput"
-                        className="flex items-center space-x-3 px-6 py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100
-                        text-gray-700 font-medium transition-all duration-200 cursor-pointer group"
+                        className="flex items-center space-x-3 px-6 py-3.5 rounded-xl 
+                        bg-gray-50 dark:bg-gray-800 
+                        text-gray-700 dark:text-gray-300
+                        hover:bg-gray-100 dark:hover:bg-gray-700
+                        font-medium transition-all duration-200 cursor-pointer group"
                         onClick={onClose}
                     >
                         <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,8 +94,11 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
 
                     <label
                         htmlFor="folderInput"
-                        className="flex items-center space-x-3 px-6 py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100
-                        text-gray-700 font-medium transition-all duration-200 cursor-pointer group"
+                        className="flex items-center space-x-3 px-6 py-3.5 rounded-xl 
+                        bg-gray-50 dark:bg-gray-800 
+                        text-gray-700 dark:text-gray-300
+                        hover:bg-gray-100 dark:hover:bg-gray-700
+                        font-medium transition-all duration-200 cursor-pointer group"
                         onClick={onClose}
                     >
                         <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -132,15 +145,20 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
                 </div>
 
                 {driveInfo && (
-                    <div className="mt-auto p-4 bg-gray-50 rounded-xl">
-                        <div className="text-sm font-medium text-gray-700 mb-2">Bộ nhớ đã dùng</div>
-                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="mt-auto p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                            Bộ nhớ đã dùng
+                        </div>
+                        <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                             <div
-                                className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-300"
+                                className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 
+                                rounded-full transition-all duration-300"
                                 style={{ width: `${(driveInfo.used / driveInfo.total) * 100}%` }}
                             />
                         </div>
-                        <div className="mt-2 text-sm text-gray-600">{formatBytes(driveInfo.remaining)} còn trống</div>
+                        <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                            {formatBytes(driveInfo.remaining)} còn trống
+                        </div>
                     </div>
                 )}
             </div>
