@@ -1,10 +1,12 @@
 'use client'
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Skeleton from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
 import { FileItem } from '../types';
 import JSZip from 'jszip';
 import { useTheme } from 'next-themes';
+import { Menu, Transition } from '@headlessui/react'
+import { Fragment } from 'react'
 
 interface FileListProps {
     files: FileItem[];
@@ -39,6 +41,14 @@ function getFileExtension(fileName: string): string {
     return lastDotIndex === -1 ? '' : fileName.substring(lastDotIndex + 1);
 }
 
+// Thêm enum cho các tiêu chí sắp xếp
+enum SortCriteria {
+    Default = 'default',
+    Name = 'name',
+    Size = 'size',
+    Date = 'date'
+}
+
 export default function FileList({
     files,
     isLoading,
@@ -59,12 +69,59 @@ export default function FileList({
     const folders = files.filter(file => file.mimeType === 'application/vnd.google-apps.folder');
     const regularFiles = files.filter(file => file.mimeType !== 'application/vnd.google-apps.folder');
 
-    // Sắp xếp thư mục và file theo ngày tạo mới nhất
-    folders.sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime());
-    regularFiles.sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime());
+    // Thêm state cho tiêu chí sắp xếp
+    const [sortCriteria, setSortCriteria] = useState<SortCriteria>(SortCriteria.Default);
 
-    // Kết hợp thư mục và file
-    const sortedFiles = [...folders, ...regularFiles];
+    // Thêm state cho bộ lọc đuôi file
+    const [selectedExtension, setSelectedExtension] = useState<string | null>(null);
+
+    // Lấy danh sách đuôi file duy nhất
+    const uniqueExtensions = useMemo(() => {
+        const extensions = regularFiles
+            .map(file => getFileExtension(file.name).toLowerCase())
+            .filter(ext => ext !== '');
+        return Array.from(new Set(extensions)).sort();
+    }, [regularFiles]);
+
+    // Thêm state để theo dõi việc hiển thị thư mục
+    const [showFolders, setShowFolders] = useState(true);
+
+    // Hàm sắp xếp files dựa trên tiêu chí
+    const getSortedFiles = (files: FileItem[]) => {
+        let folders = files.filter(file => file.mimeType === 'application/vnd.google-apps.folder');
+        let regularFiles = files.filter(file => file.mimeType !== 'application/vnd.google-apps.folder');
+
+        // Lọc theo đuôi file nếu có
+        if (selectedExtension) {
+            regularFiles = regularFiles.filter(file =>
+                getFileExtension(file.name).toLowerCase() === selectedExtension
+            );
+        }
+
+        switch (sortCriteria) {
+            case SortCriteria.Name:
+                folders.sort((a, b) => a.name.localeCompare(b.name));
+                regularFiles.sort((a, b) => a.name.localeCompare(b.name));
+                break;
+            case SortCriteria.Size:
+                folders.sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime());
+                regularFiles.sort((a, b) => (b.size || 0) - (a.size || 0));
+                break;
+            case SortCriteria.Date:
+                folders.sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime());
+                regularFiles.sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime());
+                break;
+            default:
+                folders.sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime());
+                regularFiles.sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime());
+        }
+
+        // Trả về danh sách files dựa vào trạng thái hiển thị thư mục
+        return showFolders ? [...folders, ...regularFiles] : regularFiles;
+    };
+
+    // Thay thế dòng const sortedFiles = [...folders, ...regularFiles]; bằng:
+    const sortedFiles = getSortedFiles(files);
 
     // State để lưu trữ chế độ hiển thị
     const [isGridView, setIsGridView] = useState(false);
@@ -294,80 +351,291 @@ export default function FileList({
             {/* Breadcrumb Navigation */}
             <div className="p-4 md:p-6 pb-2">
                 {currentFolderId && (
-                    <>
-                        <div className="flex items-center space-x-2 text-sm mb-2">
-                            <span
-                                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 
-                                cursor-pointer font-medium"
-                                onClick={() => onBackClick()}
-                            >
-                                DA22TTC
-                            </span>
-                            {folderPath.map((folder, index) => (
-                                <React.Fragment key={folder.id}>
-                                    <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                    <span
-                                        className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 
-                                        cursor-pointer font-medium"
-                                        onClick={() => onBreadcrumbClick(folder.id, index)}
-                                    >
-                                        {folder.name}
-                                    </span>
-                                </React.Fragment>
-                            ))}
-                            {currentFolderName && (
-                                <>
-                                    <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                    <span className="text-gray-800 dark:text-gray-100 font-medium">{currentFolderName}</span>
-                                </>
-                            )}
-                        </div>
+                    <div className="flex items-center space-x-2 text-sm mb-2 overflow-x-auto whitespace-nowrap">
+                        <span
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 
+                            cursor-pointer font-medium flex-shrink-0"
+                            onClick={() => onBackClick()}
+                        >
+                            DA22TTC
+                        </span>
+                        {folderPath.map((folder, index) => (
+                            <React.Fragment key={folder.id}>
+                                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                                <span
+                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 
+                                    cursor-pointer font-medium truncate max-w-[100px] md:max-w-[200px]"
+                                    onClick={() => onBreadcrumbClick(folder.id, index)}
+                                >
+                                    {folder.name}
+                                </span>
+                            </React.Fragment>
+                        ))}
+                        {currentFolderName && (
+                            <>
+                                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                                <span className="text-gray-800 dark:text-gray-100 font-medium truncate max-w-[100px] md:max-w-[200px]">
+                                    {currentFolderName}
+                                </span>
+                            </>
+                        )}
+                    </div>
+                )}
 
-                        {/* Action Buttons */}
-                        <div className="flex items-center justify-between">
-                            <button
-                                onClick={onBackClick}
-                                className="inline-flex items-center px-4 py-2 
+                {/* Action Buttons - Moved outside of currentFolderId check */}
+                <div className="flex items-center justify-between">
+                    {currentFolderId && (
+                        <button
+                            onClick={onBackClick}
+                            className="inline-flex items-center px-4 py-2 
                                 text-gray-700 dark:text-gray-200 
                                 bg-white dark:bg-gray-800 
                                 hover:bg-gray-50 dark:hover:bg-gray-700
                                 rounded-xl border border-gray-200 dark:border-gray-700 
                                 shadow-sm transition-all duration-200"
-                            >
-                                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                </svg>
-                                <span className="font-medium">Quay lại</span>
-                            </button>
+                        >
+                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                            <span className="font-medium">Quay lại</span>
+                        </button>
+                    )}
 
-                            {!isLoading && (
-                                <button
-                                    onClick={() => setIsGridView(!isGridView)}
-                                    className="inline-flex items-center px-4 py-2 
+                    {!isLoading && (
+                        <div className={`flex items-center space-x-2 ${currentFolderId ? '' : 'ml-auto'}`}>
+                            {/* Nút ẩn/hiện thư mục */}
+                            <button
+                                onClick={() => setShowFolders(!showFolders)}
+                                className="inline-flex items-center px-3 md:px-4 py-2 
                                     text-gray-700 dark:text-gray-200 
                                     bg-white dark:bg-gray-800 
                                     hover:bg-gray-50 dark:hover:bg-gray-700
                                     rounded-xl border border-gray-200 dark:border-gray-700 
                                     shadow-sm transition-all duration-200"
+                                title={showFolders ? "Ẩn thư mục" : "Hiện thư mục"}
+                            >
+                                <svg
+                                    className="w-5 h-5 md:mr-2"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                    style={{
+                                        color: showFolders ? 'currentColor' : '#9CA3AF'
+                                    }}
                                 >
-                                    {isGridView ? (
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                        </svg>
-                                    ) : (
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
-                                        </svg>
-                                    )}
-                                </button>
-                            )}
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                                    />
+                                </svg>
+                                <span className="hidden md:inline">
+                                    {showFolders ? "Ẩn thư mục" : "Hiện thư mục"}
+                                </span>
+                            </button>
+
+                            {/* Dropdown bộ lọc đuôi file */}
+                            <Menu as="div" className="relative">
+                                <Menu.Button className="inline-flex items-center px-3 md:px-4 py-2 
+                                    text-gray-700 dark:text-gray-200 
+                                    bg-white dark:bg-gray-800 
+                                    hover:bg-gray-50 dark:hover:bg-gray-700
+                                    rounded-xl border border-gray-200 dark:border-gray-700 
+                                    shadow-sm transition-all duration-200">
+                                    <svg className="w-5 h-5 md:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                            d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    </svg>
+                                    <span className="hidden md:inline">{selectedExtension ? `.${selectedExtension}` : 'Loại file'}</span>
+                                    <svg className="w-5 h-5 hidden md:inline md:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </Menu.Button>
+
+                                <Transition
+                                    as={Fragment}
+                                    enter="transition ease-out duration-100"
+                                    enterFrom="transform opacity-0 scale-95"
+                                    enterTo="transform opacity-100 scale-100"
+                                    leave="transition ease-in duration-75"
+                                    leaveFrom="transform opacity-100 scale-100"
+                                    leaveTo="transform opacity-0 scale-95"
+                                >
+                                    <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right 
+                                        bg-white dark:bg-gray-800 
+                                        rounded-xl border border-gray-200 dark:border-gray-700
+                                        shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none
+                                        divide-y divide-gray-100 dark:divide-gray-700">
+                                        <div className="px-1 py-1">
+                                            <Menu.Item>
+                                                {({ active }) => (
+                                                    <button
+                                                        onClick={() => setSelectedExtension(null)}
+                                                        className={`${active ? 'bg-gray-100 dark:bg-gray-700' : ''
+                                                            } ${selectedExtension === null ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-200'
+                                                            } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                                                    >
+                                                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                d="M4 6h16M4 12h16M4 18h16" />
+                                                        </svg>
+                                                        Tất cả
+                                                    </button>
+                                                )}
+                                            </Menu.Item>
+                                            {uniqueExtensions.map(ext => (
+                                                <Menu.Item key={ext}>
+                                                    {({ active }) => (
+                                                        <button
+                                                            onClick={() => setSelectedExtension(ext)}
+                                                            className={`${active ? 'bg-gray-100 dark:bg-gray-700' : ''
+                                                                } ${selectedExtension === ext ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-200'
+                                                                } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                                                        >
+                                                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                    d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                            </svg>
+                                                            .{ext}
+                                                        </button>
+                                                    )}
+                                                </Menu.Item>
+                                            ))}
+                                        </div>
+                                    </Menu.Items>
+                                </Transition>
+                            </Menu>
+
+                            {/* Dropdown bộ lọc sắp xếp */}
+                            <Menu as="div" className="relative">
+                                <Menu.Button className="inline-flex items-center px-3 md:px-4 py-2 
+                                    text-gray-700 dark:text-gray-200 
+                                    bg-white dark:bg-gray-800 
+                                    hover:bg-gray-50 dark:hover:bg-gray-700
+                                    rounded-xl border border-gray-200 dark:border-gray-700 
+                                    shadow-sm transition-all duration-200">
+                                    <svg className="w-5 h-5 md:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                            d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                                    </svg>
+                                    <span className="hidden md:inline">Sắp xếp</span>
+                                    <svg className="w-5 h-5 hidden md:inline md:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </Menu.Button>
+
+                                <Transition
+                                    as={Fragment}
+                                    enter="transition ease-out duration-100"
+                                    enterFrom="transform opacity-0 scale-95"
+                                    enterTo="transform opacity-100 scale-100"
+                                    leave="transition ease-in duration-75"
+                                    leaveFrom="transform opacity-100 scale-100"
+                                    leaveTo="transform opacity-0 scale-95"
+                                >
+                                    <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right 
+                                        bg-white dark:bg-gray-800 
+                                        rounded-xl border border-gray-200 dark:border-gray-700
+                                        shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none
+                                        divide-y divide-gray-100 dark:divide-gray-700">
+                                        <div className="px-1 py-1">
+                                            <Menu.Item>
+                                                {({ active }) => (
+                                                    <button
+                                                        onClick={() => setSortCriteria(SortCriteria.Default)}
+                                                        className={`${active ? 'bg-gray-100 dark:bg-gray-700' : ''
+                                                            } ${sortCriteria === SortCriteria.Default ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-200'
+                                                            } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                                                    >
+                                                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                d="M4 6h16M4 12h16M4 18h16" />
+                                                        </svg>
+                                                        Mặc định
+                                                    </button>
+                                                )}
+                                            </Menu.Item>
+                                            <Menu.Item>
+                                                {({ active }) => (
+                                                    <button
+                                                        onClick={() => setSortCriteria(SortCriteria.Name)}
+                                                        className={`${active ? 'bg-gray-100 dark:bg-gray-700' : ''
+                                                            } ${sortCriteria === SortCriteria.Name ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-200'
+                                                            } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                                                    >
+                                                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                                                        </svg>
+                                                        Tên
+                                                    </button>
+                                                )}
+                                            </Menu.Item>
+                                            <Menu.Item>
+                                                {({ active }) => (
+                                                    <button
+                                                        onClick={() => setSortCriteria(SortCriteria.Size)}
+                                                        className={`${active ? 'bg-gray-100 dark:bg-gray-700' : ''
+                                                            } ${sortCriteria === SortCriteria.Size ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-200'
+                                                            } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                                                    >
+                                                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                                                        </svg>
+                                                        Dung lượng
+                                                    </button>
+                                                )}
+                                            </Menu.Item>
+                                            <Menu.Item>
+                                                {({ active }) => (
+                                                    <button
+                                                        onClick={() => setSortCriteria(SortCriteria.Date)}
+                                                        className={`${active ? 'bg-gray-100 dark:bg-gray-700' : ''
+                                                            } ${sortCriteria === SortCriteria.Date ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-200'
+                                                            } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                                                    >
+                                                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                        </svg>
+                                                        Ngày tạo
+                                                    </button>
+                                                )}
+                                            </Menu.Item>
+                                        </div>
+                                    </Menu.Items>
+                                </Transition>
+                            </Menu>
+
+                            {/* Nút chuyển đổi grid/list view */}
+                            <button
+                                onClick={() => setIsGridView(!isGridView)}
+                                className="inline-flex items-center px-3 md:px-4 py-2 
+                                    text-gray-700 dark:text-gray-200 
+                                    bg-white dark:bg-gray-800 
+                                    hover:bg-gray-50 dark:hover:bg-gray-700
+                                    rounded-xl border border-gray-200 dark:border-gray-700 
+                                    shadow-sm transition-all duration-200"
+                            >
+                                {isGridView ? (
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                    </svg>
+                                ) : (
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
+                                    </svg>
+                                )}
+                            </button>
                         </div>
-                    </>
-                )}
+                    )}
+                </div>
             </div>
 
             {/* File Grid/List với khả năng cuộn */}
