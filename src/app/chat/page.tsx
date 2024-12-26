@@ -30,6 +30,7 @@ export default function ChatPage() {
         language: ''
     });
     const [isMobile, setIsMobile] = useState(false);
+    const [fileInputKey, setFileInputKey] = useState(0);
 
     useEffect(() => {
         const initAI = async () => {
@@ -169,6 +170,7 @@ export default function ChatPage() {
                 fileInputRef.current.value = '';
             }
         }
+        setFileInputKey(prev => prev + 1);
     };
 
     const handleRemoveFile = (index: number) => {
@@ -177,6 +179,7 @@ export default function ChatPage() {
         if (documentInputRef.current) {
             documentInputRef.current.value = '';
         }
+        setFileInputKey(prev => prev + 1);
     };
 
     useEffect(() => {
@@ -219,6 +222,7 @@ export default function ChatPage() {
                         selectedFiles={selectedFiles}
                         setSelectedFiles={setSelectedFiles}
                         setFilePreviews={setFilePreviews}
+                        fileInputKey={fileInputKey}
                     />
                 </div>
             </div>
@@ -228,7 +232,6 @@ export default function ChatPage() {
                 setCodePreview={setCodePreview}
                 isMobile={isMobile}
             />
-
 
             <Toaster />
         </div>
