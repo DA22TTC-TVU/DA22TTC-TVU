@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faCopy, faImage, faFileUpload, faCompress, faExpand, faTimes, faCode, faSpinner, faPlay } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faCopy, faImage, faFileUpload, faCompress, faExpand, faTimes, faCode, faSpinner, faPlay, faArrowUp } from '@fortawesome/free-solid-svg-icons';
 import { useRouter } from 'next/navigation';
 import { Toaster, toast } from 'react-hot-toast';
 import ReactMarkdown from 'react-markdown';
@@ -83,6 +83,7 @@ export default function ChatPage() {
         language: ''
     });
     const [isExecuting, setIsExecuting] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
 
     const suggestionMessages = [
         "Hướng dẫn cách viết một REST API đơn giản với Node.js",
@@ -431,6 +432,16 @@ export default function ChatPage() {
         }
     };
 
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 768); // md breakpoint của Tailwind
+        };
+
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
             <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
@@ -494,6 +505,7 @@ export default function ChatPage() {
                                 {messages.map((message, index) => (
                                     <div
                                         key={index}
+                                        id={`message-${index}`}
                                         className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} group`}
                                     >
                                         <div className={`${message.role === 'user' ? 'ml-auto' : 'mr-auto'} max-w-[85%]`}>
@@ -568,15 +580,20 @@ export default function ChatPage() {
                                                                                             isOpen: true,
                                                                                             content: code,
                                                                                             originalCode: code,
-                                                                                            isFullscreen: false,
+                                                                                            isFullscreen: isMobile,
                                                                                             mode: 'edit',
                                                                                             language: match[1]
                                                                                         });
                                                                                     }}
-                                                                                    className="p-2 bg-gray-700 rounded-lg 
-                                                                                    hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm"
+                                                                                    className="p-2 bg-gray-700 hover:bg-gray-600 
+                                                                                    text-gray-100 dark:text-gray-200
+                                                                                    rounded-lg transition-colors 
+                                                                                    flex items-center gap-2 text-sm"
                                                                                 >
-                                                                                    <FontAwesomeIcon icon={match[1] === 'html' ? faCode : faPlay} className="w-4 h-4" />
+                                                                                    <FontAwesomeIcon
+                                                                                        icon={match[1] === 'html' ? faCode : faPlay}
+                                                                                        className="w-4 h-4"
+                                                                                    />
                                                                                     <span>{match[1] === 'html' ? 'Xem' : 'Chạy'}</span>
                                                                                 </button>
                                                                             )}
@@ -632,13 +649,25 @@ export default function ChatPage() {
                                                 )}
                                             </div>
                                             <div className={`flex mt-1 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                                <button
-                                                    onClick={() => copyToClipboard(message.content)}
-                                                    className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
-                                                        hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
-                                                >
-                                                    <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-3 h-3" />
-                                                </button>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            const messageElement = document.getElementById(`message-${index}`);
+                                                            messageElement?.scrollIntoView({ behavior: 'smooth' });
+                                                        }}
+                                                        className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
+                                                            hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                                    >
+                                                        <FontAwesomeIcon icon={faArrowUp} className="text-gray-300 w-3 h-3" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => copyToClipboard(message.content)}
+                                                        className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
+                                                            hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                                    >
+                                                        <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-3 h-3" />
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1004,34 +1033,38 @@ export default function ChatPage() {
                             <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
                         </div>
 
-                        <div className={`inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all 
-                            ${codePreview.isFullscreen ? 'fixed inset-0 w-full h-full rounded-none' : 'sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full'}`}>
-                            <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                        <div className={`inline-block align-bottom bg-white dark:bg-gray-800 
+                            text-left overflow-hidden shadow-xl transform transition-all 
+                            ${codePreview.isFullscreen || isMobile
+                                ? 'fixed inset-0 w-full h-full rounded-none'
+                                : 'sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full rounded-lg'}`}
+                        >
+                            {/* Header */}
+                            <div className="flex justify-between items-center px-4 py-3 
+                                border-b border-gray-200 dark:border-gray-700
+                                sticky top-0 bg-white dark:bg-gray-800 z-10"
+                            >
                                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                                    Chạy code
+                                    {codePreview.language === 'html' ? 'Xem HTML' : 'Chạy code'}
                                 </h3>
                                 <div className="flex items-center gap-2">
-                                    {codePreview.mode === 'run' && (
+                                    {!isMobile && (
                                         <button
-                                            onClick={() => handleRunCode(codePreview.content, codePreview.language || '')}
-                                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                                            onClick={toggleFullscreen}
+                                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 
+                                                rounded-lg transition-colors"
+                                            title={codePreview.isFullscreen ? "Thu nhỏ" : "Toàn màn hình"}
                                         >
-                                            Chạy
+                                            <FontAwesomeIcon
+                                                icon={codePreview.isFullscreen ? faCompress : faExpand}
+                                                className="w-4 h-4 text-gray-500 dark:text-gray-400"
+                                            />
                                         </button>
                                     )}
                                     <button
-                                        onClick={toggleFullscreen}
-                                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                        title={codePreview.isFullscreen ? "Thu nhỏ" : "Toàn màn hình"}
-                                    >
-                                        <FontAwesomeIcon
-                                            icon={codePreview.isFullscreen ? faCompress : faExpand}
-                                            className="w-4 h-4 text-gray-500 dark:text-gray-400"
-                                        />
-                                    </button>
-                                    <button
                                         onClick={closeCodePreview}
-                                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 
+                                            rounded-lg transition-colors"
                                         title="Đóng"
                                     >
                                         <FontAwesomeIcon
@@ -1041,7 +1074,12 @@ export default function ChatPage() {
                                     </button>
                                 </div>
                             </div>
-                            <div className={`${codePreview.isFullscreen ? 'h-[calc(100vh-56px)]' : 'h-[80vh]'} overflow-auto`}>
+
+                            {/* Content */}
+                            <div className={`${codePreview.isFullscreen || isMobile
+                                ? 'h-[calc(100vh-56px)]'
+                                : 'h-[80vh]'} overflow-auto`}
+                            >
                                 {codePreview.mode === 'preview' ? (
                                     <iframe
                                         srcDoc={codePreview.content}
