@@ -3,7 +3,7 @@
 import { useRef, FormEvent, ClipboardEvent, useEffect } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFileImport } from '@fortawesome/free-solid-svg-icons';
+import { faFileImport, faGear } from '@fortawesome/free-solid-svg-icons';
 import { SUPPORTED_FILE_TYPES } from '../types/chat';
 import { toast } from 'react-hot-toast';
 import { useState } from 'react';
@@ -24,6 +24,16 @@ interface ChatInputProps {
     setSelectedFiles: React.Dispatch<React.SetStateAction<File[]>>;
     setFilePreviews: React.Dispatch<React.SetStateAction<{ name: string, type: string }[]>>;
     fileInputKey: number;
+    mode: {
+        search: boolean;
+        speed: boolean;
+        image: boolean;
+    };
+    setMode: React.Dispatch<React.SetStateAction<{
+        search: boolean;
+        speed: boolean;
+        image: boolean;
+    }>>;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
@@ -41,11 +51,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
     selectedFiles,
     setSelectedFiles,
     setFilePreviews,
-    fileInputKey
+    fileInputKey,
+    mode,
+    setMode
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [imageLoadingStates, setImageLoadingStates] = useState<boolean[]>([]);
     const [fileLoadingStates, setFileLoadingStates] = useState<boolean[]>([]);
+    const [showModeModal, setShowModeModal] = useState(false);
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
@@ -136,6 +149,29 @@ const ChatInput: React.FC<ChatInputProps> = ({
             document.removeEventListener('paste', handleDocumentPaste);
         };
     }, []);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const modal = document.getElementById('mode-modal');
+            const button = document.getElementById('mode-button');
+            if (modal && button &&
+                !modal.contains(event.target as Node) &&
+                !button.contains(event.target as Node)) {
+                setShowModeModal(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleModeChange = (modeType: 'search' | 'speed' | 'image') => {
+        setMode(prev => ({
+            search: modeType === 'search' ? !prev.search : false,
+            speed: modeType === 'speed' ? !prev.speed : false,
+            image: modeType === 'image' ? !prev.image : false,
+        }));
+    };
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -281,8 +317,97 @@ const ChatInput: React.FC<ChatInputProps> = ({
             )}
 
             <div className="flex flex-col space-y-2">
-                <div className="flex items-end space-x-2">
-                    <div className="flex space-x-2">
+                <div className="flex flex-col sm:flex-row sm:items-end space-y-2 sm:space-y-0 sm:space-x-2">
+                    <div className="flex space-x-2 justify-start sm:justify-normal">
+                        <div className="relative group">
+                            <button
+                                type="button"
+                                id="mode-button"
+                                onClick={() => setShowModeModal(!showModeModal)}
+                                className="p-2.5 
+                                    min-h-[42px] min-w-[42px]
+                                    flex items-center justify-center
+                                    bg-gray-100 hover:bg-gray-200 
+                                    dark:bg-gray-700 dark:hover:bg-gray-600 
+                                    text-gray-600 dark:text-gray-300
+                                    rounded-xl border border-gray-200 dark:border-gray-600
+                                    transition-all duration-200
+                                    group relative"
+                            >
+                                <FontAwesomeIcon
+                                    icon={faGear}
+                                    className="w-5 h-5 transform group-hover:scale-110 transition-transform"
+                                />
+                                <span
+                                    className="absolute -top-10 left-1/2 -translate-x-1/2 
+                                    px-2 py-1 rounded-lg text-xs font-medium
+                                    bg-gray-800 dark:bg-gray-700 text-white
+                                    opacity-0 group-hover:opacity-100
+                                    transition-opacity duration-200
+                                    whitespace-nowrap
+                                    z-10"
+                                >
+                                    Chọn chế độ
+                                </span>
+                            </button>
+
+                            {showModeModal && (
+                                <div
+                                    id="mode-modal"
+                                    className="absolute bottom-full mb-2 left-0 w-[11em] bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 z-50"
+                                >
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={mode.search}
+                                                onChange={() => handleModeChange('search')}
+                                                className="sr-only peer"
+                                            />
+                                            <div
+                                                className="relative w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-500"
+                                            ></div>
+                                            <span className="ml-3 text-base font-medium text-gray-900 dark:text-gray-300">
+                                                🔍 Tìm kiếm
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={mode.speed}
+                                                onChange={() => handleModeChange('speed')}
+                                                className="sr-only peer"
+                                            />
+                                            <div
+                                                className="relative w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-500"
+                                            ></div>
+                                            <span className="ml-3 text-base font-medium text-gray-900 dark:text-gray-300">
+                                                ⚡ Tốc độ
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <label className="inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={mode.image}
+                                                onChange={() => handleModeChange('image')}
+                                                className="sr-only peer"
+                                            />
+                                            <div
+                                                className="relative w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-500"
+                                            ></div>
+                                            <span className="ml-3 text-base font-medium text-gray-900 dark:text-gray-300">
+                                                🖼️ Tạo ảnh
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         {/* Input và button mới */}
                         <input
                             type="file"
@@ -297,74 +422,77 @@ const ChatInput: React.FC<ChatInputProps> = ({
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
                             className="p-2.5 
-                         min-h-[42px] min-w-[42px]
-                         flex items-center justify-center
-                         bg-gray-100 hover:bg-gray-200 
-                         dark:bg-gray-700 dark:hover:bg-gray-600 
-                         text-gray-600 dark:text-gray-300
-                         rounded-xl border border-gray-200 dark:border-gray-600
-                         transition-all duration-200
-                         group relative"
+                                min-h-[42px] min-w-[42px]
+                                flex items-center justify-center
+                                bg-gray-100 hover:bg-gray-200 
+                                dark:bg-gray-700 dark:hover:bg-gray-600 
+                                text-gray-600 dark:text-gray-300
+                                rounded-xl border border-gray-200 dark:border-gray-600
+                                transition-all duration-200
+                                group relative"
                             title="Tải ảnh và tài liệu"
                         >
                             <FontAwesomeIcon
-                                icon={faFileImport} // Icon mới
+                                icon={faFileImport}
                                 className="w-5 h-5 transform group-hover:scale-110 transition-transform"
                             />
                             <span
                                 className="absolute -top-10 left-1/2 -translate-x-1/2 
-                           px-2 py-1 rounded-lg text-xs font-medium
-                           bg-gray-800 dark:bg-gray-700 text-white
-                           opacity-0 group-hover:opacity-100
-                           transition-opacity duration-200
-                           whitespace-nowrap
-                           z-10"
+                                px-2 py-1 rounded-lg text-xs font-medium
+                                bg-gray-800 dark:bg-gray-700 text-white
+                                opacity-0 group-hover:opacity-100
+                                transition-opacity duration-200
+                                whitespace-nowrap
+                                z-10"
                             >
                                 Tải lên
                             </span>
                         </button>
                     </div>
 
-                    <TextareaAutosize
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSubmit(e);
-                            }
-                        }}
-                        placeholder="Nhập tin nhắn..."
-                        className="flex-1 px-3 py-2.5 
-                                        text-sm sm:text-base 
-                                        bg-gray-50 dark:bg-gray-700 
-                                        border border-gray-200 dark:border-gray-600
-                                        rounded-xl 
-                                        focus:outline-none focus:ring-2 focus:ring-blue-500
-                                        text-gray-900 dark:text-white
-                                        placeholder-gray-400 dark:placeholder-gray-500
-                                        resize-none min-h-[42px]
-                                        transition-all duration-200"
-                        disabled={isLoading}
-                        minRows={1}
-                        maxRows={5}
-                    />
+                    <div className="flex flex-1 space-x-2">
+                        <TextareaAutosize
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSubmit(e);
+                                }
+                            }}
+                            placeholder="Nhập tin nhắn..."
+                            className="flex-1 px-3 py-2.5 
+                                text-sm sm:text-base 
+                                bg-gray-50 dark:bg-gray-700 
+                                border border-gray-200 dark:border-gray-600
+                                rounded-xl 
+                                focus:outline-none focus:ring-2 focus:ring-blue-500
+                                text-gray-900 dark:text-white
+                                placeholder-gray-400 dark:placeholder-gray-500
+                                resize-none min-h-[42px]
+                                transition-all duration-200"
+                            disabled={isLoading}
+                            minRows={1}
+                            maxRows={5}
+                        />
 
-                    <button
-                        type="submit"
-                        disabled={isLoading || (!input.trim() && !selectedImages.length && !selectedFiles.length)}
-                        className="px-4 py-2.5 
-                                        min-h-[42px]
-                                        text-sm sm:text-base 
-                                        bg-gradient-to-r from-blue-500 to-indigo-500 
-                                        text-white font-medium rounded-xl
-                                        hover:from-blue-600 hover:to-indigo-600 
-                                        disabled:opacity-50 disabled:cursor-not-allowed
-                                        transform active:scale-[0.98] 
-                                        transition-all duration-200"
-                    >
-                        Gửi
-                    </button>
+                        <button
+                            type="submit"
+                            disabled={isLoading || (!input.trim() && !selectedImages.length && !selectedFiles.length)}
+                            className="px-3 sm:px-4 py-2.5 
+                                min-h-[42px]
+                                text-sm sm:text-base 
+                                bg-gradient-to-r from-blue-500 to-indigo-500 
+                                text-white font-medium rounded-xl
+                                hover:from-blue-600 hover:to-indigo-600 
+                                disabled:opacity-50 disabled:cursor-not-allowed
+                                transform active:scale-[0.98] 
+                                transition-all duration-200
+                                whitespace-nowrap"
+                        >
+                            Gửi
+                        </button>
+                    </div>
                 </div>
             </div>
         </form>

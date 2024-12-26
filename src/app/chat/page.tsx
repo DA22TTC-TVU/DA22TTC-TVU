@@ -31,6 +31,11 @@ export default function ChatPage() {
     });
     const [isMobile, setIsMobile] = useState(false);
     const [fileInputKey, setFileInputKey] = useState(0);
+    const [mode, setMode] = useState({
+        search: false,
+        speed: false,
+        image: false,
+    });
 
     useEffect(() => {
         const initAI = async () => {
@@ -223,6 +228,8 @@ export default function ChatPage() {
                         setSelectedFiles={setSelectedFiles}
                         setFilePreviews={setFilePreviews}
                         fileInputKey={fileInputKey}
+                        mode={mode}
+                        setMode={setMode}
                     />
                 </div>
             </div>
