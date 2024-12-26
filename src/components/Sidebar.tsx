@@ -293,9 +293,11 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
 
             {/* Chat Modal */}
             {isChatOpen && (
-                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-lg mx-4 rounded-2xl shadow-xl">
-                        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-end md:items-center justify-center">
+                    <div className="bg-white dark:bg-gray-800 w-full h-[100vh] md:h-[80vh] md:max-w-lg md:mx-4 
+                        md:rounded-2xl shadow-xl flex flex-col">
+                        {/* Header */}
+                        <div className="shrink-0 p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Trò Chuyện</h3>
                             <button
                                 onClick={() => setIsChatOpen(false)}
@@ -307,11 +309,11 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
                             </button>
                         </div>
 
-                        <div className="p-4 h-96 overflow-y-auto">
+                        {/* Messages Container */}
+                        <div className="flex-1 overflow-y-auto p-4 min-h-0">
                             <div className="space-y-4">
                                 {messages.slice().reverse().map(msg => (
-                                    <div
-                                        key={msg.id}
+                                    <div key={msg.id}
                                         className={`bg-gray-50 dark:bg-gray-700 p-3 rounded-lg
                                             ${!isChatOpen && msg.timestamp > lastSeenTimestamp ? 'border-l-4 border-blue-500' : ''}`}
                                     >
@@ -334,7 +336,8 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
                             </div>
                         </div>
 
-                        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                        {/* Input Container */}
+                        <div className="shrink-0 p-4 border-t border-gray-200 dark:border-gray-700">
                             <div className="flex gap-2">
                                 <input
                                     type="text"
