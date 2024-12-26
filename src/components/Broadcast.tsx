@@ -20,6 +20,9 @@ export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProp
     const [myStreamId, setMyStreamId] = useState('');
     const [agoraAppId, setAgoraAppId] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+    const [password, setPassword] = useState('');
+    const [isStarting, setIsStarting] = useState(false);
 
     useEffect(() => {
         const getCredentials = async () => {
@@ -73,12 +76,17 @@ export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProp
         };
     }, []); // Chỉ chạy một lần khi component mount
 
-    const startSharing = async () => {
-        if (!agoraAppId) {
-            toast.error('Chưa sẵn sàng kết nối!');
+    const handleStartSharing = async () => {
+        setIsPasswordModalOpen(true);
+    };
+
+    const startSharingWithPassword = async () => {
+        if (!password.trim()) {
+            toast.error('Vui lòng nhập mật khẩu!');
             return;
         }
 
+        setIsStarting(true);
         try {
             const streamId = Math.random().toString(36).substring(7);
             setMyStreamId(streamId);
@@ -93,14 +101,16 @@ export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProp
 
             await client.publish(screenTrack);
 
-            // Lưu thông tin stream vào Firebase
+            // Lưu thông tin stream và mật khẩu vào Firebase
             const db = await getDatabaseInstance();
             await set(ref(db, `streams/${streamId}`), {
                 name: 'Màn hình của ' + streamId,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                password: password
             });
 
             setIsSharing(true);
+            setIsPasswordModalOpen(false);
             toast.success('Bắt đầu chia sẻ màn hình!');
 
             // Xử lý khi người dùng dừng chia sẻ từ UI Chrome
@@ -123,7 +133,6 @@ export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProp
         } catch (error) {
             console.error('Lỗi khi chia sẻ màn hình:', error);
             toast.error('Không thể chia sẻ màn hình!');
-            // Đảm bảo dọn dẹp trạng thái
             setIsSharing(false);
             setMyStreamId('');
             try {
@@ -131,6 +140,8 @@ export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProp
             } catch (e) {
                 console.error('Lỗi khi rời khỏi kênh:', e);
             }
+        } finally {
+            setIsStarting(false);
         }
     };
 
@@ -187,7 +198,51 @@ export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProp
                 </div>
             )}
 
-            {/* Modal */}
+            {/* Password Modal */}
+            {isPasswordModalOpen && createPortal(
+                <div
+                    className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[9999] flex items-center justify-center"
+                    onClick={() => setIsPasswordModalOpen(false)}
+                >
+                    <div
+                        className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl w-full max-w-md mx-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                                Đặt mật khẩu cho buổi phát
+                            </h2>
+                            <button
+                                onClick={() => setIsPasswordModalOpen(false)}
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600
+                                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white mb-4"
+                            placeholder="Nhập mật khẩu..."
+                        />
+                        <button
+                            onClick={startSharingWithPassword}
+                            disabled={isStarting || !password}
+                            className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg
+                                     hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isStarting ? 'Đang bắt đầu...' : 'Bắt đầu phát sóng'}
+                        </button>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* Main Modal Content */}
             {isModalOpen && createPortal(
                 <div
                     className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[9999] flex items-center justify-center"
@@ -217,7 +272,7 @@ export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProp
                             {/* Nút chia sẻ màn hình */}
                             {!isSharing ? (
                                 <button
-                                    onClick={startSharing}
+                                    onClick={handleStartSharing}
                                     className="w-full mb-4 px-4 py-2 bg-blue-500 text-white rounded-lg 
                                     hover:bg-blue-600 transition-colors flex items-center justify-center space-x-2"
                                 >
