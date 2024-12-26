@@ -7,6 +7,7 @@ import JSZip from 'jszip';
 import { useTheme } from 'next-themes';
 import { Menu, Transition } from '@headlessui/react'
 import { Fragment } from 'react'
+import { toast, Toaster } from 'react-hot-toast';
 
 interface FileListProps {
     files: FileItem[];
@@ -269,6 +270,11 @@ export default function FileList({
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
+    };
+
+    // Thêm hàm để tạo link tải file
+    const generateDownloadLink = (fileId: string) => {
+        return `https://drive.usercontent.google.com/download?id=${fileId}&export=download&authuser=0`;
     };
 
     // Hàm tải về thư mục dưới dạng zip
@@ -716,22 +722,57 @@ export default function FileList({
 
                                         {/* Download Button */}
                                         {!file.isUploading && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    file.mimeType === 'application/vnd.google-apps.folder'
-                                                        ? handleDownloadFolder(file.id, file.name)
-                                                        : onDownload(file.id, file.name);
-                                                }}
-                                                className="p-2 opacity-0 group-hover:opacity-100 
-                                                hover:bg-gray-100 dark:hover:bg-gray-700
-                                                rounded-lg transition-all duration-200"
-                                            >
-                                                <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                                </svg>
-                                            </button>
+                                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {/* Nút copy link - chỉ hiển thị cho file */}
+                                                {file.mimeType !== 'application/vnd.google-apps.folder' && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const link = generateDownloadLink(file.id);
+                                                            navigator.clipboard.writeText(link);
+                                                            toast.success('Đã sao chép link tải file!', {
+                                                                duration: 2000,
+                                                                position: 'bottom-right',
+                                                                style: {
+                                                                    background: theme === 'dark' ? '#374151' : '#fff',
+                                                                    color: theme === 'dark' ? '#fff' : '#000',
+                                                                    border: theme === 'dark' ? '1px solid #4B5563' : '1px solid #E5E7EB',
+                                                                },
+                                                            });
+                                                        }}
+                                                        className="p-2 text-gray-500 dark:text-gray-400 
+                                                        hover:text-blue-500 dark:hover:text-blue-400 
+                                                        hover:bg-blue-50 dark:hover:bg-blue-900/30
+                                                        rounded-lg transition-colors"
+                                                        title="Sao chép link tải"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                                        </svg>
+                                                    </button>
+                                                )}
+
+                                                {/* Nút tải xuống - hiển thị cho cả file và thư mục */}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        file.mimeType === 'application/vnd.google-apps.folder'
+                                                            ? handleDownloadFolder(file.id, file.name)
+                                                            : onDownload(file.id, file.name);
+                                                    }}
+                                                    className="p-2 text-gray-500 dark:text-gray-400 
+                                                    hover:text-green-500 dark:hover:text-green-400 
+                                                    hover:bg-green-50 dark:hover:bg-green-900/30
+                                                    rounded-lg transition-colors"
+                                                    title="Tải xuống"
+                                                >
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                    </svg>
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
 
@@ -757,6 +798,17 @@ export default function FileList({
                     )}
                 </div>
             </div>
+
+            {/* Thêm Toaster vào cuối */}
+            <Toaster
+                toastOptions={{
+                    style: {
+                        background: theme === 'dark' ? '#374151' : '#fff',
+                        color: theme === 'dark' ? '#fff' : '#000',
+                        border: theme === 'dark' ? '1px solid #4B5563' : '1px solid #E5E7EB',
+                    },
+                }}
+            />
         </div>
     );
 } 
