@@ -6,6 +6,8 @@ import FileList from '../components/FileList';
 import { DriveInfo, FileItem } from '../types';
 import { Dialog } from '@headlessui/react'
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Toaster } from 'react-hot-toast';
+
 interface FolderBreadcrumb {
   id: string;
   name: string;
@@ -630,6 +632,16 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-white dark:bg-gray-900">
+      <Toaster
+        position="top-center"
+        containerStyle={{
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 10000 // Đặt z-index cao hơn modal của Broadcast (9999)
+        }}
+      />
+
       <div className="max-w-[1800px] w-full mx-auto flex flex-col flex-1 overflow-hidden">
         <div className="md:hidden p-4">
           <button
@@ -660,6 +672,7 @@ export default function Home() {
             isOpen={isSidebarOpen}
             onClose={() => setIsSidebarOpen(false)}
             fileInputRef={React.useRef<HTMLInputElement>(null)}
+            isLoading={isLoading}
           />
 
           <FileList
