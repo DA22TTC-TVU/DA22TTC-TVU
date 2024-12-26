@@ -337,7 +337,12 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                         // Tùy chỉnh các thẻ markdown khác
                                         p: ({ children }) => (
                                             <p className="mb-4 last:mb-0">
-                                                {String(children).replace(/\.\.\.$/, '')}
+                                                {Array.isArray(children)
+                                                    ? children.map((child, i) =>
+                                                        typeof child === 'object' ? '' : child
+                                                    ).join('')
+                                                    : children
+                                                }
                                             </p>
                                         ),
                                         ul: ({ children }) => <ul className="list-disc pl-4 mb-4 last:mb-0">{children}</ul>,
@@ -360,7 +365,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                         ),
                                     }}
                                 >
-                                    {streamingText.replace(/\.\.\.$/, '')}
+                                    {streamingText}
                                 </ReactMarkdown>
                                 <div ref={streamEndRef} />
                             </div>
