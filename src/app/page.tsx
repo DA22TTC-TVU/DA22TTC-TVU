@@ -7,6 +7,7 @@ import { DriveInfo, FileItem } from '../types';
 import { Dialog } from '@headlessui/react'
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Toaster } from 'react-hot-toast';
+import { useTheme } from 'next-themes';
 
 interface FolderBreadcrumb {
   id: string;
@@ -29,6 +30,8 @@ export default function Home() {
   const [currentFolderName, setCurrentFolderName] = useState<string>('');
   const [folderPath, setFolderPath] = useState<FolderBreadcrumb[]>([]);
   const [isAISearch, setIsAISearch] = useState(false);
+
+  const { theme } = useTheme();
 
   const formatBytes = (bytes: number) => {
     if (!bytes) return '0 Bytes';
@@ -639,6 +642,13 @@ export default function Home() {
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 10000 // Đặt z-index cao hơn modal của Broadcast (9999)
+        }}
+        toastOptions={{
+          style: {
+            background: theme === 'dark' ? '#374151' : '#fff',
+            color: theme === 'dark' ? '#fff' : '#000',
+            border: theme === 'dark' ? '1px solid #4B5563' : '1px solid #E5E7EB',
+          },
         }}
       />
 

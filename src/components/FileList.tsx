@@ -680,7 +680,7 @@ export default function FileList({
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                     d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
                             </svg>
-                            <p className="text-lg font-medium text-gray-900">Thư mục trống</p>
+                            <p className="text-lg font-medium text-gray-900 dark:text-white">Thư mục trống</p>
                             <p className="text-sm text-gray-500 mt-2">Chưa có tệp tin hoặc thư mục nào</p>
                         </div>
                     ) : (
@@ -732,7 +732,6 @@ export default function FileList({
                                                             navigator.clipboard.writeText(link);
                                                             toast.success('Đã sao chép link tải file!', {
                                                                 duration: 2000,
-                                                                position: 'bottom-right',
                                                                 style: {
                                                                     background: theme === 'dark' ? '#374151' : '#fff',
                                                                     color: theme === 'dark' ? '#fff' : '#000',
@@ -798,17 +797,6 @@ export default function FileList({
                     )}
                 </div>
             </div>
-
-            {/* Thêm Toaster vào cuối */}
-            <Toaster
-                toastOptions={{
-                    style: {
-                        background: theme === 'dark' ? '#374151' : '#fff',
-                        color: theme === 'dark' ? '#fff' : '#000',
-                        border: theme === 'dark' ? '1px solid #4B5563' : '1px solid #E5E7EB',
-                    },
-                }}
-            />
         </div>
     );
 } 
