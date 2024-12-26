@@ -360,7 +360,11 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                             d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                     </svg>
-                                    <span>Trò Chuyện</span>
+                                    <span className="flex items-center gap-2">
+                                        Trò Chuyện
+                                        <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900 
+                                            text-blue-600 dark:text-blue-400 rounded">Beta</span>
+                                    </span>
                                 </div>
                                 {unreadCount > 0 && (
                                     <span className="bg-red-500 text-white px-2 py-1 rounded-full text-xs">
