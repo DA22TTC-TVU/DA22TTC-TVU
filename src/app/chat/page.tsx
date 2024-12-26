@@ -6,6 +6,7 @@ import ChatHeader from './components/ChatHeader';
 import ChatInput from './components/ChatInput';
 import ChatMessages from './components/ChatMessages';
 import CodePreviewModal from './components/CodePreviewModal';
+import { useTheme } from 'next-themes';
 import { ChatHistory, CodePreviewModalType, ImagePart, Message } from './types/chat';
 
 export default function ChatPage() {
@@ -36,6 +37,8 @@ export default function ChatPage() {
         speed: false,
         image: false,
     });
+    const [stopGenerating, setStopGenerating] = useState<(() => void) | null>(null);
+    const { theme } = useTheme();
 
     useEffect(() => {
         const initAI = async () => {
@@ -43,10 +46,6 @@ export default function ChatPage() {
                 const response = await fetch('/api/drive/ai-search');
                 const { apiKey } = await response.json();
                 const genAI = new GoogleGenerativeAI(apiKey);
-
-                const aiModel = genAI.getGenerativeModel({
-                    model: "gemini-2.0-flash-exp",
-                });
 
                 const generationConfig = {
                     temperature: 1,
@@ -56,17 +55,86 @@ export default function ChatPage() {
                     responseMimeType: "text/plain",
                 };
 
-                setModel(aiModel.startChat({
+                const aiModel = genAI.getGenerativeModel({
+                    model: "gemini-2.0-flash-exp",
+                });
+
+                const chat = aiModel.startChat({
                     generationConfig,
-                    history: chatHistory,
-                }));
+                    history: [],
+                });
+
+                setModel({ model: aiModel, chat, generationConfig });
             } catch (error) {
                 console.error('Lỗi khởi tạo AI:', error);
                 toast.error('Không thể kết nối với AI');
             }
         };
         initAI();
-    }, [chatHistory]);
+    }, []);
+
+    const regenerateMessage = async (index: number) => {
+        if (!model || isLoading) return;
+
+        const userMessage = messages[index - 1];
+        if (!userMessage || userMessage.role !== 'user') return;
+
+        setMessages(prev => prev.filter((_, i) => i !== index));
+        setIsLoading(true);
+        setStreamingText('');
+
+        try {
+            const historyUpToIndex = chatHistory.slice(0, index - 1);
+
+            const newChat = model.model.startChat({
+                generationConfig: model.generationConfig,
+                history: historyUpToIndex
+            });
+
+            setModel((prev: any) => ({ ...prev, chat: newChat }));
+
+            let parts = [];
+            if (userMessage.content) {
+                parts.push(userMessage.content);
+            }
+
+            const result = await newChat.sendMessageStream(parts);
+            let fullResponse = '';
+
+            const controller = new AbortController();
+            setStopGenerating(() => () => controller.abort());
+
+            try {
+                for await (const chunk of result.stream) {
+                    if (controller.signal.aborted) break;
+                    const chunkText = chunk.text();
+                    fullResponse += chunkText;
+                    setStreamingText(fullResponse);
+                }
+            } catch (error: any) {
+                if (error.name === 'AbortError') {
+                    console.log('Đã dừng sinh văn bản');
+                } else {
+                    throw error;
+                }
+            }
+
+            setChatHistory(prev => [...prev, {
+                role: 'model',
+                parts: [{ text: fullResponse }]
+            }]);
+
+            setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
+            setStreamingText('');
+
+        } catch (error) {
+            console.error('Lỗi khi tạo lại tin nhắn:', error);
+            toast.error('Lỗi khi tạo lại tin nhắn');
+        } finally {
+            setIsLoading(false);
+            setStopGenerating(null);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -78,6 +146,11 @@ export default function ChatPage() {
         setStreamingText('');
 
         try {
+            const newChat = model.model.startChat({
+                generationConfig: model.generationConfig,
+                history: chatHistory
+            });
+
             let parts = [];
             let imageUrls: string[] = [];
             let files = [...filePreviews];
@@ -139,13 +212,27 @@ export default function ChatPage() {
                 documentInputRef.current.value = '';
             }
 
-            const result = await model.sendMessageStream(parts);
+            const result = await newChat.sendMessageStream(parts);
             let fullResponse = '';
 
-            for await (const chunk of result.stream) {
-                const chunkText = chunk.text();
-                fullResponse += chunkText;
-                setStreamingText(fullResponse);
+            const controller = new AbortController();
+            setStopGenerating(() => () => controller.abort());
+
+            try {
+                for await (const chunk of result.stream) {
+                    if (controller.signal.aborted) {
+                        break;
+                    }
+                    const chunkText = chunk.text();
+                    fullResponse += chunkText;
+                    setStreamingText(fullResponse);
+                }
+            } catch (error: any) {
+                if (error.name === 'AbortError') {
+                    console.log('Đã dừng sinh văn bản');
+                } else {
+                    throw error;
+                }
             }
 
             setChatHistory(prev => [...prev, {
@@ -156,11 +243,14 @@ export default function ChatPage() {
             setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
             setStreamingText('');
 
+            setModel((prev: any) => ({ ...prev, chat: newChat }));
+
         } catch (error) {
             console.error('Lỗi khi gửi tin nhắn:', error);
             toast.error('Lỗi khi gửi tin nhắn');
         } finally {
             setIsLoading(false);
+            setStopGenerating(null);
         }
     };
 
@@ -187,6 +277,24 @@ export default function ChatPage() {
         setFileInputKey(prev => prev + 1);
     };
 
+    const deleteMessage = (index: number) => {
+        // Xóa tin nhắn khỏi UI
+        setMessages(prev => prev.filter((_, i) => i !== index));
+
+        // Xóa tin nhắn khỏi history
+        const historyIndex = Math.floor(index / 2); // Vì mỗi cặp user-assistant là 2 tin nhắn
+        setChatHistory(prev => prev.filter((_, i) => i !== historyIndex));
+
+        // Nếu xóa tin nhắn cuối cùng và đang loading, hủy loading
+        if (index === messages.length - 1 && isLoading) {
+            setIsLoading(false);
+            setStreamingText('');
+            if (stopGenerating) {
+                stopGenerating();
+            }
+        }
+    };
+
     useEffect(() => {
         const checkMobile = () => {
             setIsMobile(window.innerWidth < 768); // md breakpoint của Tailwind
@@ -199,7 +307,7 @@ export default function ChatPage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
-            <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
+            <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
                 <ChatHeader />
 
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-2 sm:p-4">
@@ -210,6 +318,8 @@ export default function ChatPage() {
                         setCodePreview={setCodePreview}
                         isMobile={isMobile}
                         setInput={setInput}
+                        regenerateMessage={regenerateMessage}
+                        deleteMessage={deleteMessage}
                     />
 
                     <ChatInput
@@ -230,6 +340,7 @@ export default function ChatPage() {
                         fileInputKey={fileInputKey}
                         mode={mode}
                         setMode={setMode}
+                        stopGenerating={stopGenerating}
                     />
                 </div>
             </div>
@@ -240,7 +351,15 @@ export default function ChatPage() {
                 isMobile={isMobile}
             />
 
-            <Toaster />
+            <Toaster
+                toastOptions={{
+                    style: {
+                        background: theme === 'dark' ? '#374151' : '#fff',
+                        color: theme === 'dark' ? '#fff' : '#000',
+                        border: theme === 'dark' ? '1px solid #4B5563' : '1px solid #E5E7EB',
+                    },
+                }}
+            />
         </div>
     );
 }

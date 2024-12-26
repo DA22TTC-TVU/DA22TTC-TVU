@@ -6,7 +6,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCopy, faPlay, faCode, faArrowUp } from '@fortawesome/free-solid-svg-icons';
+import { faCopy, faPlay, faCode, faArrowUp, faRotate, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { toast } from 'react-hot-toast';
 import { Message, CodePreviewModalType } from '../types/chat';
 
@@ -17,6 +17,8 @@ interface ChatMessagesProps {
     setCodePreview: React.Dispatch<React.SetStateAction<CodePreviewModalType>>;
     isMobile: boolean;
     setInput: any;
+    regenerateMessage: (index: number) => void;
+    deleteMessage: (index: number) => void;
 }
 
 const ChatMessages: React.FC<ChatMessagesProps> = ({
@@ -25,7 +27,9 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
     streamingText,
     setCodePreview,
     isMobile,
-    setInput
+    setInput,
+    regenerateMessage,
+    deleteMessage
 }) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const streamEndRef = useRef<HTMLDivElement>(null);
@@ -75,16 +79,16 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                     key={index}
                                     onClick={() => handleSuggestionClick(message)}
                                     className="p-3 sm:p-4 text-left
-                                                    bg-gray-50 dark:bg-gray-700
-                                                    hover:bg-gray-100 dark:hover:bg-gray-600
-                                                    border border-gray-200 dark:border-gray-600
-                                                    rounded-xl
-                                                    transition-all duration-200
-                                                    group"
+                                            bg-gray-50 dark:bg-gray-700
+                                            hover:bg-gray-100 dark:hover:bg-gray-600
+                                            border border-gray-200 dark:border-gray-600
+                                            rounded-xl
+                                            transition-all duration-200
+                                            group"
                                 >
                                     <p className="text-xs sm:text-sm md:text-base text-gray-600 dark:text-gray-300
-                                                    group-hover:text-gray-900 dark:group-hover:text-white
-                                                    line-clamp-2 sm:line-clamp-none">
+                                            group-hover:text-gray-900 dark:group-hover:text-white
+                                            line-clamp-2 sm:line-clamp-none">
                                         {message}
                                     </p>
                                 </button>
@@ -100,10 +104,10 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                             id={`message-${index}`}
                             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} group`}
                         >
-                            <div className={`${message.role === 'user' ? 'ml-auto' : 'mr-auto'} max-w-[85%]`}>
-                                <div className={`rounded-xl p-2.5 sm:p-4 ${message.role === 'user'
-                                    ? 'bg-blue-500 text-white'
-                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                            <div className={`${message.role === 'user' ? 'mx-2' : 'w-full'} `}>
+                                <div className={`p-2.5 sm:p-4 ${message.role === 'user'
+                                    ? 'bg-blue-500 text-white rounded-xl'
+                                    : 'text-gray-900 dark:text-white'
                                     }`}>
                                     {message.files && message.files.length > 0 && (
                                         <div className="flex flex-wrap gap-2 mb-2">
@@ -111,9 +115,9 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                                 <div
                                                     key={idx}
                                                     className="flex items-center gap-2 px-3 py-2 
-                                                                    bg-gray-50/10 dark:bg-gray-600/30
-                                                                    border border-gray-200/20 dark:border-gray-600/30
-                                                                    rounded-lg"
+                                                        bg-gray-50/10 dark:bg-gray-600/30
+                                                        border border-gray-200/20 dark:border-gray-600/30
+                                                        rounded-lg"
                                                 >
                                                     <svg
                                                         className="w-5 h-5 text-current opacity-70"
@@ -178,9 +182,9 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                                                             });
                                                                         }}
                                                                         className="p-2 bg-gray-700 hover:bg-gray-600 
-                                                                                    text-gray-100 dark:text-gray-200
-                                                                                    rounded-lg transition-colors 
-                                                                                    flex items-center gap-2 text-sm"
+                                                                            text-gray-100 dark:text-gray-200
+                                                                            rounded-lg transition-colors 
+                                                                            flex items-center gap-2 text-sm"
                                                                     >
                                                                         <FontAwesomeIcon
                                                                             icon={match[1] === 'html' ? faCode : faPlay}
@@ -193,7 +197,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                                                 <button
                                                                     onClick={() => copyToClipboard(String(children))}
                                                                     className="p-2 bg-gray-700 rounded-lg 
-                                                                                hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm"
+                                                                        hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm"
                                                                 >
                                                                     <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-4 h-4" />
                                                                 </button>
@@ -248,16 +252,32 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                                 messageElement?.scrollIntoView({ behavior: 'smooth' });
                                             }}
                                             className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
-                                                            hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                                    hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
                                         >
                                             <FontAwesomeIcon icon={faArrowUp} className="text-gray-300 w-3 h-3" />
                                         </button>
+                                        {message.role === 'assistant' && (
+                                            <button
+                                                onClick={() => regenerateMessage(index)}
+                                                className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
+                                                        hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                            >
+                                                <FontAwesomeIcon icon={faRotate} className="text-gray-300 w-3 h-3" />
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => copyToClipboard(message.content)}
                                             className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
-                                                            hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                                    hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
                                         >
                                             <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-3 h-3" />
+                                        </button>
+                                        <button
+                                            onClick={() => deleteMessage(index)}
+                                            className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
+                                                    hover:bg-red-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                        >
+                                            <FontAwesomeIcon icon={faTrash} className="text-gray-300 w-3 h-3" />
                                         </button>
                                     </div>
                                 </div>
@@ -265,8 +285,8 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                         </div>
                     ))}
                     {isLoading && !streamingText && (
-                        <div className="flex justify-start">
-                            <div className="bg-gray-100 dark:bg-gray-700 rounded-xl p-4">
+                        <div className="flex justify-start w-full">
+                            <div className="rounded-xl p-4 w-full">
                                 <div className="flex space-x-2">
                                     <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
                                     <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
@@ -277,8 +297,8 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                     )}
                     <div ref={messagesEndRef} />
                     {streamingText && (
-                        <div className="flex justify-start">
-                            <div className="bg-gray-100 dark:bg-gray-700 rounded-xl p-4 max-w-[85%]">
+                        <div className="flex justify-start w-full">
+                            <div className="p-4 w-full">
                                 <ReactMarkdown
                                     className="prose dark:prose-invert max-w-none text-sm sm:text-base break-words"
                                     remarkPlugins={[remarkGfm]}
@@ -294,7 +314,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                                     <button
                                                         onClick={() => copyToClipboard(String(children))}
                                                         className="absolute -top-2 -right-2 p-2 bg-gray-700 rounded-lg 
-                                                                    hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm z-10"
+                                                            hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm z-10"
                                                     >
                                                         <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-4 h-4" />
                                                     </button>

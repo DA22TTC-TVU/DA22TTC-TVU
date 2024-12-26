@@ -34,6 +34,7 @@ interface ChatInputProps {
         speed: boolean;
         image: boolean;
     }>>;
+    stopGenerating: (() => void) | null;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
@@ -53,7 +54,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setFilePreviews,
     fileInputKey,
     mode,
-    setMode
+    setMode,
+    stopGenerating
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [imageLoadingStates, setImageLoadingStates] = useState<boolean[]>([]);
@@ -357,12 +359,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
                                     className="absolute bottom-full mb-2 left-0 w-[11em] bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 z-50"
                                 >
                                     <div className="flex items-center justify-between mb-2">
-                                        <label className="inline-flex items-center cursor-pointer">
+                                        <label className="inline-flex items-center cursor-not-allowed opacity-50">
                                             <input
                                                 type="checkbox"
                                                 checked={mode.search}
                                                 onChange={() => handleModeChange('search')}
                                                 className="sr-only peer"
+                                                disabled={true}
                                             />
                                             <div
                                                 className="relative w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-500"
@@ -478,19 +481,25 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
                         <button
                             type="submit"
-                            disabled={isLoading || (!input.trim() && !selectedImages.length && !selectedFiles.length)}
-                            className="px-3 sm:px-4 py-2.5 
+                            disabled={!stopGenerating && (isLoading || (!input.trim() && !selectedImages.length && !selectedFiles.length))}
+                            className={`px-3 sm:px-4 py-2.5 
                                 min-h-[42px]
                                 text-sm sm:text-base 
-                                bg-gradient-to-r from-blue-500 to-indigo-500 
+                                ${stopGenerating
+                                    ? 'bg-red-500 hover:bg-red-600'
+                                    : 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'
+                                }
                                 text-white font-medium rounded-xl
-                                hover:from-blue-600 hover:to-indigo-600 
                                 disabled:opacity-50 disabled:cursor-not-allowed
                                 transform active:scale-[0.98] 
                                 transition-all duration-200
-                                whitespace-nowrap"
+                                whitespace-nowrap`}
+                            onClick={stopGenerating ? (e) => {
+                                e.preventDefault();
+                                stopGenerating();
+                            } : undefined}
                         >
-                            Gửi
+                            {stopGenerating ? 'Dừng' : 'Gửi'}
                         </button>
                     </div>
                 </div>
