@@ -6,7 +6,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCopy, faPlay, faCode, faArrowUp, faRotate, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faCopy, faPlay, faCode, faArrowUp, faRotate, faTrash, faDownload } from '@fortawesome/free-solid-svg-icons';
 import { toast } from 'react-hot-toast';
 import { Message, CodePreviewModalType } from '../types/chat';
 
@@ -154,6 +154,43 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                         </div>
                                     )}
 
+                                    {message.generatedImages?.map((img, index) => (
+                                        <div key={index} className="relative">
+                                            {img.isLoading ? (
+                                                <div className="w-64 h-64 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse flex items-center justify-center">
+                                                    <svg className="animate-spin h-8 w-8 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                </div>
+                                            ) : (
+                                                <div className="inline-flex relative">
+                                                    <div className="relative group">
+                                                        <img
+                                                            src={`data:image/jpeg;base64,${img.base64}`}
+                                                            alt={`Generated image ${index + 1}`}
+                                                            className="w-full h-auto rounded-lg hover:cursor-pointer sm:max-w-[25em]"
+                                                        />
+                                                        <button
+                                                            onClick={() => {
+                                                                const link = document.createElement('a');
+                                                                link.href = `data:image/jpeg;base64,${img.base64}`;
+                                                                link.download = `generated-image-${Date.now()}.jpg`;
+                                                                link.click();
+                                                            }}
+                                                            className="absolute top-2 right-2 p-2 
+                                                                     bg-gray-800/70 hover:bg-gray-700 
+                                                                     rounded-lg transition-all duration-200 
+                                                                     opacity-0 group-hover:opacity-100"
+                                                        >
+                                                            <FontAwesomeIcon icon={faDownload} className="text-white w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+
                                     {message.content && (
                                         <ReactMarkdown
                                             className="prose dark:prose-invert max-w-none text-sm sm:text-base break-words"
@@ -244,43 +281,45 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                         </ReactMarkdown>
                                     )}
                                 </div>
-                                <div className={`flex mt-1 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => {
-                                                const messageElement = document.getElementById(`message-${index}`);
-                                                messageElement?.scrollIntoView({ behavior: 'smooth' });
-                                            }}
-                                            className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
-                                                    hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
-                                        >
-                                            <FontAwesomeIcon icon={faArrowUp} className="text-gray-300 w-3 h-3" />
-                                        </button>
-                                        {message.role === 'assistant' && (
+                                {(message.generatedImages?.[0]?.isLoading) && message.content !== 'Đang tạo ảnh...' && (
+                                    <div className={`flex mt-1 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className="flex gap-2">
                                             <button
-                                                onClick={() => regenerateMessage(index)}
+                                                onClick={() => {
+                                                    const messageElement = document.getElementById(`message-${index}`);
+                                                    messageElement?.scrollIntoView({ behavior: 'smooth' });
+                                                }}
                                                 className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
                                                         hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
                                             >
-                                                <FontAwesomeIcon icon={faRotate} className="text-gray-300 w-3 h-3" />
+                                                <FontAwesomeIcon icon={faArrowUp} className="text-gray-300 w-3 h-3" />
                                             </button>
-                                        )}
-                                        <button
-                                            onClick={() => copyToClipboard(message.content)}
-                                            className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
-                                                    hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
-                                        >
-                                            <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-3 h-3" />
-                                        </button>
-                                        <button
-                                            onClick={() => deleteMessage(index)}
-                                            className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
-                                                    hover:bg-red-600 transition-all duration-200 flex items-center gap-2 text-sm"
-                                        >
-                                            <FontAwesomeIcon icon={faTrash} className="text-gray-300 w-3 h-3" />
-                                        </button>
+                                            {message.role === 'assistant' && (
+                                                <button
+                                                    onClick={() => regenerateMessage(index)}
+                                                    className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
+                                                            hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                                >
+                                                    <FontAwesomeIcon icon={faRotate} className="text-gray-300 w-3 h-3" />
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => copyToClipboard(message.content)}
+                                                className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
+                                                        hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                            >
+                                                <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-3 h-3" />
+                                            </button>
+                                            <button
+                                                onClick={() => deleteMessage(index)}
+                                                className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
+                                                        hover:bg-red-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                            >
+                                                <FontAwesomeIcon icon={faTrash} className="text-gray-300 w-3 h-3" />
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     ))}

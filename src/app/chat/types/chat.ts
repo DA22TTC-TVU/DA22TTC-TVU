@@ -3,7 +3,11 @@ interface Message {
     role: 'user' | 'assistant';
     content: string;
     imageUrls?: string[];
-    files?: { name: string, type: string }[];
+    files?: { name: string; type: string; }[];
+    generatedImages?: {
+        base64: string;
+        isLoading?: boolean;
+    }[];
 }
 
 interface ChatHistory {
