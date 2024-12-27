@@ -248,15 +248,34 @@ export default function ChatPage() {
 
         try {
             if (mode.image && togetherModel) {
+                let imageUrls: string[] = [];
+                let files = [...filePreviews];
+
+                if (selectedImages.length > 0 && imagePreviews.length > 0) {
+                    imageUrls = [...imagePreviews];
+                }
+
                 setMessages(prev => [
                     ...prev,
-                    { role: 'user', content: userMessage },
+                    {
+                        role: 'user',
+                        content: userMessage,
+                        imageUrls: imageUrls,
+                        files: files
+                    },
                     {
                         role: 'assistant',
                         content: 'Đang tạo ảnh...',
                         generatedImages: [{ base64: '', isLoading: true }]
                     }
                 ]);
+
+                handleRemoveImage();
+                setSelectedFiles([]);
+                setFilePreviews([]);
+                if (documentInputRef.current) {
+                    documentInputRef.current.value = '';
+                }
 
                 const imagePromptResult = await model.chat.sendMessage([
                     "Convert this message to an English image generation prompt, only return the prompt without any explanation: " + userMessage
