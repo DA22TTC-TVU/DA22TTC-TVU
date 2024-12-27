@@ -564,6 +564,8 @@ export default function ChatPage() {
                     onNewChat={handleNewChat}
                     onSelectChat={handleSelectChat}
                     currentMessages={messages}
+                    streamingText={streamingText}
+                    isLoading={isLoading}
                 />
 
                 <div className="flex-1">

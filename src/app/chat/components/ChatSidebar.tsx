@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PlusIcon, ChatBubbleLeftIcon, TrashIcon, XMarkIcon, Bars3Icon } from '@heroicons/react/24/outline';
-
+import { toast } from 'react-hot-toast';
 interface ChatSession {
     id: string;
     title: string;
@@ -11,10 +11,12 @@ interface ChatSession {
 interface ChatSidebarProps {
     onNewChat: () => void;
     onSelectChat: (session: ChatSession) => void;
-    currentMessages: any[]; // Sử dụng type Message của bạn
+    currentMessages: any[];
+    streamingText: any;
+    isLoading: any;
 }
 
-export default function ChatSidebar({ onNewChat, onSelectChat, currentMessages }: ChatSidebarProps) {
+export default function ChatSidebar({ onNewChat, onSelectChat, currentMessages, streamingText, isLoading }: ChatSidebarProps) {
     const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
     const [currentSessionId, setCurrentSessionId] = useState<string>('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -76,6 +78,10 @@ export default function ChatSidebar({ onNewChat, onSelectChat, currentMessages }
     };
 
     const handleNewChat = () => {
+        if (isLoading || streamingText) {
+            toast.error('Không thể tạo trò chuyện mới khi AI đang trả lời');
+            return;
+        }
         setCurrentSessionId(''); // Reset currentSessionId khi tạo chat mới
         onNewChat();
     };
