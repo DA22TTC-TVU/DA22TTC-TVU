@@ -7,7 +7,8 @@ import JSZip from 'jszip';
 import { useTheme } from 'next-themes';
 import { Menu, Transition } from '@headlessui/react'
 import { Fragment } from 'react'
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
+import { isPreviewableFile } from '../utils/fileHelpers';
 
 interface FileListProps {
     files: FileItem[];
@@ -134,6 +135,11 @@ export default function FileList({
     const [compressionProgress, setCompressionProgress] = useState(0);
 
     const [hasFolders, setHasFolders] = useState<{ [key: string]: boolean }>({});
+
+    // Thêm state để quản lý modal xem trước
+    const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+    const [previewContent, setPreviewContent] = useState<string>('');
+    const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
     useEffect(() => {
         const checkFolders = async () => {
@@ -333,6 +339,28 @@ export default function FileList({
         }
     };
 
+    // Thêm hàm để lấy nội dung file
+    const fetchFileContent = async (fileId: string) => {
+        try {
+            setIsPreviewLoading(true);
+            const response = await fetch(`/api/drive/preview?fileId=${fileId}`);
+            const data = await response.text();
+            setPreviewContent(data);
+        } catch (error) {
+            console.error('Lỗi khi tải nội dung file:', error);
+            toast.error('Không thể tải nội dung file');
+        } finally {
+            setIsPreviewLoading(false);
+        }
+    };
+
+    // Thêm hàm xử lý click để mở preview
+    const handlePreviewClick = async (e: React.MouseEvent, file: FileItem) => {
+        e.stopPropagation();
+        setPreviewFile(file);
+        await fetchFileContent(file.id);
+    };
+
     return (
         <div
             className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 min-h-0"
@@ -392,8 +420,8 @@ export default function FileList({
                     </div>
                 )}
 
-                {/* Action Buttons - Moved outside of currentFolderId check */}
-                <div className="flex items-center justify-between">
+                {/* Action Buttons */}
+                <div className="flex flex-wrap items-center gap-2 justify-between">
                     {currentFolderId && (
                         <button
                             onClick={onBackClick}
@@ -412,7 +440,7 @@ export default function FileList({
                     )}
 
                     {!isLoading && (
-                        <div className={`flex items-center space-x-2 ${currentFolderId ? '' : 'ml-auto'}`}>
+                        <div className={`flex flex-wrap items-center gap-2 ${currentFolderId ? '' : 'ml-auto'}`}>
                             {/* Nút ẩn/hiện thư mục */}
                             <button
                                 onClick={() => setShowFolders(!showFolders)}
@@ -723,6 +751,26 @@ export default function FileList({
                                         {/* Download Button */}
                                         {!file.isUploading && (
                                             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {/* Nút xem trước - chỉ hiển thị cho các file có thể xem trước */}
+                                                {file.mimeType !== 'application/vnd.google-apps.folder' &&
+                                                    isPreviewableFile(file.name) && (
+                                                        <button
+                                                            onClick={(e) => handlePreviewClick(e, file)}
+                                                            className="p-2 text-gray-500 dark:text-gray-400 
+                                                        hover:text-purple-500 dark:hover:text-purple-400 
+                                                        hover:bg-purple-50 dark:hover:bg-purple-900/30
+                                                        rounded-lg transition-colors"
+                                                            title="Xem trước"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                            </svg>
+                                                        </button>
+                                                    )}
+
                                                 {/* Nút copy link - chỉ hiển thị cho file */}
                                                 {file.mimeType !== 'application/vnd.google-apps.folder' && (
                                                     <button
@@ -797,6 +845,72 @@ export default function FileList({
                     )}
                 </div>
             </div>
+
+            {/* Thêm Modal Preview vào cuối, trước thẻ đóng div cuối cùng */}
+            {previewFile && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+                        <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+                            <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
+                        </div>
+
+                        <div className="inline-block w-full max-w-4xl p-6 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                                    {previewFile.name}
+                                </h3>
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(previewContent);
+                                            toast.success('Đã sao chép nội dung!');
+                                        }}
+                                        className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 
+                                            rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 
+                                            hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                        </svg>
+                                        Sao chép
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setPreviewFile(null);
+                                            setPreviewContent('');
+                                        }}
+                                        className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 
+                                            rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 
+                                            hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                        Đóng
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Content */}
+                            {isPreviewLoading ? (
+                                <div className="flex items-center justify-center h-96">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                                </div>
+                            ) : (
+                                <div className="relative">
+                                    <pre className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg overflow-x-auto text-sm max-h-[70vh] overflow-y-auto">
+                                        <code className="language-plaintext whitespace-pre-wrap break-words">
+                                            {previewContent}
+                                        </code>
+                                    </pre>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 } 
