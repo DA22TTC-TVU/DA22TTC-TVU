@@ -203,11 +203,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
     };
 
     const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        // Cập nhật giá trị ngay lập tức cho UI
-        e.target.value = e.target.value;
-        // Debounce việc cập nhật state
-        debouncedSetInput(e.target.value);
-    }, [debouncedSetInput]);
+        const value = e.target.value;
+        // Cập nhật state ngay lập tức để hiển thị text
+        setInput(value);
+        // Sau đó mới debounce cho các xử lý khác nếu cần
+        debouncedSetInput(value);
+    }, [setInput, debouncedSetInput]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -216,6 +217,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         }
     }, [handleSubmit]);
 
+    // Cleanup debounce
     useEffect(() => {
         return () => {
             debouncedSetInput.cancel();

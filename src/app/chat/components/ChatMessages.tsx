@@ -281,7 +281,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                         </ReactMarkdown>
                                     )}
                                 </div>
-                                {(message.generatedImages?.[0]?.isLoading) && message.content !== 'Đang tạo ảnh...' && (
+                                {(message.generatedImages?.[0]?.isLoading) || message.content !== 'Đang tạo ảnh...' && (
                                     <div className={`flex mt-1 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                         <div className="flex gap-2">
                                             <button
