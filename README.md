@@ -57,7 +57,7 @@
 
 - Clone repository:
   ```bash
-  git clone https://github.com/DA22TTC-TVU/DA22TTC-TVU.github.io.git
+  git clone https://github.com/DA22TTC-TVU/DA22TTC-TVU.git
   ```
 - Cài đặt dependencies:
   ```bash
