@@ -1,12 +1,13 @@
 // ChatInput.tsx
 'use client'
-import { useRef, FormEvent, ClipboardEvent, useEffect } from 'react';
+import { useRef, FormEvent, ClipboardEvent, useEffect, useCallback, useMemo } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFileImport, faGear } from '@fortawesome/free-solid-svg-icons';
 import { SUPPORTED_FILE_TYPES } from '../types/chat';
 import { toast } from 'react-hot-toast';
 import { useState } from 'react';
+import { debounce } from 'lodash';
 
 interface ChatInputProps {
     input: string;
@@ -61,6 +62,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
     const [imageLoadingStates, setImageLoadingStates] = useState<boolean[]>([]);
     const [fileLoadingStates, setFileLoadingStates] = useState<boolean[]>([]);
     const [showModeModal, setShowModeModal] = useState(false);
+
+    const debouncedSetInput = useMemo(
+        () => debounce((value: string) => {
+            setInput(value);
+        }, 10),
+        [setInput]
+    );
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
@@ -193,6 +201,26 @@ const ChatInput: React.FC<ChatInputProps> = ({
             return newMode;
         });
     };
+
+    const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        // Cập nhật giá trị ngay lập tức cho UI
+        e.target.value = e.target.value;
+        // Debounce việc cập nhật state
+        debouncedSetInput(e.target.value);
+    }, [debouncedSetInput]);
+
+    const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSubmit(e);
+        }
+    }, [handleSubmit]);
+
+    useEffect(() => {
+        return () => {
+            debouncedSetInput.cancel();
+        };
+    }, [debouncedSetInput]);
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -478,13 +506,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     <div className="flex flex-1 space-x-2">
                         <TextareaAutosize
                             value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault();
-                                    handleSubmit(e);
-                                }
-                            }}
+                            onChange={handleInputChange}
+                            onKeyDown={handleKeyDown}
                             placeholder="Nhập tin nhắn..."
                             className="flex-1 px-3 py-2.5 
                                 text-sm sm:text-base 
@@ -496,6 +519,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
                                 placeholder-gray-400 dark:placeholder-gray-500
                                 resize-none min-h-[42px]
                                 transition-all duration-200"
+                            style={{
+                                transform: 'translateZ(0)', // Kích hoạt GPU acceleration
+                                backfaceVisibility: 'hidden'
+                            }}
                             disabled={isLoading}
                             minRows={1}
                             maxRows={5}
