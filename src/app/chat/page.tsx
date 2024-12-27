@@ -8,6 +8,7 @@ import ChatMessages from './components/ChatMessages';
 import CodePreviewModal from './components/CodePreviewModal';
 import { useTheme } from 'next-themes';
 import { ChatHistory, CodePreviewModalType, ImagePart, Message } from './types/chat';
+import Groq from 'groq-sdk';
 
 export default function ChatPage() {
     const [messages, setMessages] = useState<Message[]>([]);
@@ -39,39 +40,66 @@ export default function ChatPage() {
     });
     const [stopGenerating, setStopGenerating] = useState<(() => void) | null>(null);
     const { theme } = useTheme();
+    const [groqModel, setGroqModel] = useState<Groq | null>(null);
 
     useEffect(() => {
-        const initAI = async () => {
-            try {
-                const response = await fetch('/api/drive/ai-search');
-                const { apiKey } = await response.json();
-                const genAI = new GoogleGenerativeAI(apiKey);
+        const initGroq = async () => {
+            if (mode.speed && !groqModel) {
+                try {
+                    const response = await fetch('/api/drive/ai-search');
+                    const { groqApiKey } = await response.json();
 
-                const generationConfig = {
-                    temperature: 1,
-                    topP: 0.95,
-                    topK: 40,
-                    maxOutputTokens: 8192,
-                    responseMimeType: "text/plain",
-                };
+                    if (!groqApiKey) {
+                        throw new Error('Không tìm thấy GROQ API key');
+                    }
 
-                const aiModel = genAI.getGenerativeModel({
-                    model: "gemini-2.0-flash-exp",
-                });
+                    const groq = new Groq({ apiKey: groqApiKey, dangerouslyAllowBrowser: true });
+                    setGroqModel(groq);
+                    setModel({ model: groq });
+                } catch (error) {
+                    console.error('Lỗi khởi tạo GROQ:', error);
+                    toast.error('Không thể kết nối với GROQ');
 
-                const chat = aiModel.startChat({
-                    generationConfig,
-                    history: [],
-                });
-
-                setModel({ model: aiModel, chat, generationConfig });
-            } catch (error) {
-                console.error('Lỗi khởi tạo AI:', error);
-                toast.error('Không thể kết nối với AI');
+                }
             }
         };
-        initAI();
-    }, []);
+        initGroq();
+    }, [mode.speed, groqModel]);
+
+    useEffect(() => {
+        const initGemini = async () => {
+            if (!mode.speed) {
+                try {
+                    const response = await fetch('/api/drive/ai-search');
+                    const { apiKey } = await response.json();
+                    const genAI = new GoogleGenerativeAI(apiKey);
+
+                    const generationConfig = {
+                        temperature: 1,
+                        topP: 0.95,
+                        topK: 40,
+                        maxOutputTokens: 8192,
+                        responseMimeType: "text/plain",
+                    };
+
+                    const aiModel = genAI.getGenerativeModel({
+                        model: "gemini-2.0-flash-exp",
+                    });
+
+                    const chat = aiModel.startChat({
+                        generationConfig,
+                        history: [],
+                    });
+
+                    setModel({ model: aiModel, chat, generationConfig });
+                } catch (error) {
+                    console.error('Lỗi khởi tạo Gemini:', error);
+                    toast.error('Không thể kết nối với Gemini');
+                }
+            }
+        };
+        initGemini();
+    }, [mode.speed]);
 
     const regenerateMessage = async (index: number) => {
         if (!model || isLoading) return;
@@ -84,49 +112,97 @@ export default function ChatPage() {
         setStreamingText('');
 
         try {
-            const historyUpToIndex = chatHistory.slice(0, index - 1);
+            if (mode.speed && groqModel) {
+                const historyUpToIndex = chatHistory.slice(0, index - 1);
+                const chatCompletion = await groqModel.chat.completions.create({
+                    messages: [
+                        ...historyUpToIndex.map(msg => ({
+                            role: msg.role === 'model' ? 'assistant' : msg.role,
+                            content: msg.parts[0].text
+                        })),
+                        {
+                            role: 'user',
+                            content: userMessage
+                        }
+                    ],
+                    model: "llama-3.3-70b-versatile",
+                    temperature: 1,
+                    max_tokens: 1024,
+                    top_p: 1,
+                    stream: true
+                } as any);
 
-            const newChat = model.model.startChat({
-                generationConfig: model.generationConfig,
-                history: historyUpToIndex
-            });
+                let fullResponse = '';
+                const controller = new AbortController();
+                setStopGenerating(() => () => controller.abort());
 
-            setModel((prev: any) => ({ ...prev, chat: newChat }));
-
-            let parts = [];
-            if (userMessage.content) {
-                parts.push(userMessage.content);
-            }
-
-            const result = await newChat.sendMessageStream(parts);
-            let fullResponse = '';
-
-            const controller = new AbortController();
-            setStopGenerating(() => () => controller.abort());
-
-            try {
-                for await (const chunk of result.stream) {
-                    if (controller.signal.aborted) break;
-                    const chunkText = chunk.text();
-                    fullResponse += chunkText;
-                    setStreamingText(fullResponse);
+                try {
+                    for await (const chunk of chatCompletion as any) {
+                        if (controller.signal.aborted) break;
+                        const chunkText = chunk.choices[0]?.delta?.content || '';
+                        fullResponse += chunkText;
+                        setStreamingText(fullResponse);
+                    }
+                } catch (error: any) {
+                    if (error.name === 'AbortError') {
+                        console.log('Đã dừng sinh văn bản');
+                    } else {
+                        throw error;
+                    }
                 }
-            } catch (error: any) {
-                if (error.name === 'AbortError') {
-                    console.log('Đã dừng sinh văn bản');
-                } else {
-                    throw error;
+
+                setChatHistory(prev => [...prev, {
+                    role: 'model',
+                    parts: [{ text: fullResponse }]
+                }]);
+
+                setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
+                setStreamingText('');
+
+            } else {
+                const historyUpToIndex = chatHistory.slice(0, index - 1);
+
+                const newChat = model.model.startChat({
+                    generationConfig: model.generationConfig,
+                    history: historyUpToIndex
+                });
+
+                setModel((prev: any) => ({ ...prev, chat: newChat }));
+
+                let parts = [];
+                if (userMessage.content) {
+                    parts.push(userMessage.content);
                 }
+
+                const result = await newChat.sendMessageStream(parts);
+                let fullResponse = '';
+
+                const controller = new AbortController();
+                setStopGenerating(() => () => controller.abort());
+
+                try {
+                    for await (const chunk of result.stream) {
+                        if (controller.signal.aborted) break;
+                        const chunkText = chunk.text();
+                        fullResponse += chunkText;
+                        setStreamingText(fullResponse);
+                    }
+                } catch (error: any) {
+                    if (error.name === 'AbortError') {
+                        console.log('Đã dừng sinh văn bản');
+                    } else {
+                        throw error;
+                    }
+                }
+
+                setChatHistory(prev => [...prev, {
+                    role: 'model',
+                    parts: [{ text: fullResponse }]
+                }]);
+
+                setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
+                setStreamingText('');
             }
-
-            setChatHistory(prev => [...prev, {
-                role: 'model',
-                parts: [{ text: fullResponse }]
-            }]);
-
-            setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
-            setStreamingText('');
-
         } catch (error) {
             console.error('Lỗi khi tạo lại tin nhắn:', error);
             toast.error('Lỗi khi tạo lại tin nhắn');
@@ -146,104 +222,162 @@ export default function ChatPage() {
         setStreamingText('');
 
         try {
-            const newChat = model.model.startChat({
-                generationConfig: model.generationConfig,
-                history: chatHistory
-            });
+            if (mode.speed && groqModel) {
+                setChatHistory(prev => [...prev, {
+                    role: 'user',
+                    parts: [{ text: userMessage }]
+                }]);
 
-            let parts = [];
-            let imageUrls: string[] = [];
-            let files = [...filePreviews];
+                setMessages(prev => [...prev, {
+                    role: 'user',
+                    content: userMessage
+                }]);
 
-            if (selectedImages.length > 0 && imagePreviews.length > 0) {
-                imageUrls = [...imagePreviews];
-                for (const preview of imagePreviews) {
-                    const imageData = preview.split(',')[1] || '';
-                    const imagePart: ImagePart = {
-                        inlineData: {
-                            data: imageData,
-                            mimeType: selectedImages[0].type,
+                const chatCompletion = await groqModel.chat.completions.create({
+                    messages: [
+                        ...chatHistory.map(msg => ({
+                            role: msg.role === 'model' ? 'assistant' : msg.role,
+                            content: msg.parts[0].text
+                        })),
+                        {
+                            role: 'user',
+                            content: userMessage
                         }
-                    };
-                    parts.push(imagePart);
-                }
-            }
+                    ],
+                    model: "llama-3.3-70b-versatile",
+                    temperature: 1,
+                    max_tokens: 1024,
+                    top_p: 1,
+                    stream: true
+                } as any);
 
-            if (userMessage) {
-                parts.push(userMessage);
-            }
+                let fullResponse = '';
+                const controller = new AbortController();
+                setStopGenerating(() => () => controller.abort());
 
-            if (selectedFiles.length > 0) {
-                for (const file of selectedFiles) {
-                    const reader = new FileReader();
-                    const fileData = await new Promise<string>((resolve) => {
-                        reader.onloadend = () => {
-                            const base64Data = reader.result as string;
-                            resolve(base64Data.split(',')[1] || '');
-                        };
-                        reader.readAsDataURL(file);
-                    });
-
-                    parts.push({
-                        inlineData: {
-                            data: fileData,
-                            mimeType: file.type
-                        }
-                    });
-                }
-            }
-
-            setChatHistory(prev => [...prev, {
-                role: 'user',
-                parts: [{ text: userMessage }]
-            }]);
-
-            setMessages(prev => [...prev, {
-                role: 'user',
-                content: userMessage,
-                imageUrls: imageUrls,
-                files: files
-            }]);
-
-            handleRemoveImage();
-            setSelectedFiles([]);
-            setFilePreviews([]);
-            if (documentInputRef.current) {
-                documentInputRef.current.value = '';
-            }
-
-            const result = await newChat.sendMessageStream(parts);
-            let fullResponse = '';
-
-            const controller = new AbortController();
-            setStopGenerating(() => () => controller.abort());
-
-            try {
-                for await (const chunk of result.stream) {
-                    if (controller.signal.aborted) {
-                        break;
+                try {
+                    for await (const chunk of chatCompletion as any) {
+                        if (controller.signal.aborted) break;
+                        const chunkText = chunk.choices[0]?.delta?.content || '';
+                        fullResponse += chunkText;
+                        setStreamingText(fullResponse);
                     }
-                    const chunkText = chunk.text();
-                    fullResponse += chunkText;
-                    setStreamingText(fullResponse);
+                } catch (error: any) {
+                    if (error.name === 'AbortError') {
+                        console.log('Đã dừng sinh văn bản');
+                    } else {
+                        throw error;
+                    }
                 }
-            } catch (error: any) {
-                if (error.name === 'AbortError') {
-                    console.log('Đã dừng sinh văn bản');
-                } else {
-                    throw error;
+
+                setChatHistory(prev => [...prev, {
+                    role: 'model',
+                    parts: [{ text: fullResponse }]
+                }]);
+
+                setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
+                setStreamingText('');
+
+            } else {
+                const newChat = model.model.startChat({
+                    generationConfig: model.generationConfig,
+                    history: chatHistory
+                });
+
+                let parts = [];
+                let imageUrls: string[] = [];
+                let files = [...filePreviews];
+
+                if (selectedImages.length > 0 && imagePreviews.length > 0) {
+                    imageUrls = [...imagePreviews];
+                    for (const preview of imagePreviews) {
+                        const imageData = preview.split(',')[1] || '';
+                        const imagePart: ImagePart = {
+                            inlineData: {
+                                data: imageData,
+                                mimeType: selectedImages[0].type,
+                            }
+                        };
+                        parts.push(imagePart);
+                    }
                 }
+
+                if (userMessage) {
+                    parts.push(userMessage);
+                }
+
+                if (selectedFiles.length > 0) {
+                    for (const file of selectedFiles) {
+                        const reader = new FileReader();
+                        const fileData = await new Promise<string>((resolve) => {
+                            reader.onloadend = () => {
+                                const base64Data = reader.result as string;
+                                resolve(base64Data.split(',')[1] || '');
+                            };
+                            reader.readAsDataURL(file);
+                        });
+
+                        parts.push({
+                            inlineData: {
+                                data: fileData,
+                                mimeType: file.type
+                            }
+                        });
+                    }
+                }
+
+                setChatHistory(prev => [...prev, {
+                    role: 'user',
+                    parts: [{ text: userMessage }]
+                }]);
+
+                setMessages(prev => [...prev, {
+                    role: 'user',
+                    content: userMessage,
+                    imageUrls: imageUrls,
+                    files: files
+                }]);
+
+                handleRemoveImage();
+                setSelectedFiles([]);
+                setFilePreviews([]);
+                if (documentInputRef.current) {
+                    documentInputRef.current.value = '';
+                }
+
+                const result = await newChat.sendMessageStream(parts);
+                let fullResponse = '';
+
+                const controller = new AbortController();
+                setStopGenerating(() => () => controller.abort());
+
+                try {
+                    for await (const chunk of result.stream) {
+                        if (controller.signal.aborted) {
+                            break;
+                        }
+                        const chunkText = chunk.text();
+                        fullResponse += chunkText;
+                        setStreamingText(fullResponse);
+                    }
+                } catch (error: any) {
+                    if (error.name === 'AbortError') {
+                        console.log('Đã dừng sinh văn bản');
+                    } else {
+                        throw error;
+                    }
+                }
+
+                setChatHistory(prev => [...prev, {
+                    role: 'model',
+                    parts: [{ text: fullResponse }]
+                }]);
+
+                setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
+                setStreamingText('');
+
+                setModel((prev: any) => ({ ...prev, chat: newChat }));
             }
-
-            setChatHistory(prev => [...prev, {
-                role: 'model',
-                parts: [{ text: fullResponse }]
-            }]);
-
-            setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
-            setStreamingText('');
-
-            setModel((prev: any) => ({ ...prev, chat: newChat }));
 
         } catch (error) {
             console.error('Lỗi khi gửi tin nhắn:', error);

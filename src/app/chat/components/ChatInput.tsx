@@ -124,6 +124,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
     };
 
     const handlePaste = (e: ClipboardEvent) => {
+        // Không cho phép dán ảnh trong chế độ speed
+        if (mode.speed) {
+            return;
+        }
+
         const items = e.clipboardData?.items;
         if (!items) return;
 
@@ -168,11 +173,25 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }, []);
 
     const handleModeChange = (modeType: 'search' | 'speed' | 'image') => {
-        setMode(prev => ({
-            search: modeType === 'search' ? !prev.search : false,
-            speed: modeType === 'speed' ? !prev.speed : false,
-            image: modeType === 'image' ? !prev.image : false,
-        }));
+        setMode(prev => {
+            const newMode = {
+                search: modeType === 'search' ? !prev.search : false,
+                speed: modeType === 'speed' ? !prev.speed : false,
+                image: modeType === 'image' ? !prev.image : false,
+            };
+
+            // Nếu bật chế độ speed, xóa tất cả ảnh và file đã tải lên
+            if (modeType === 'speed' && !prev.speed) {
+                handleRemoveImage();
+                setSelectedFiles([]);
+                setFilePreviews([]);
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
+            }
+
+            return newMode;
+        });
     };
 
     return (
@@ -424,20 +443,23 @@ const ChatInput: React.FC<ChatInputProps> = ({
                         <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="p-2.5 
+                            disabled={mode.speed} // Disable nút tải lên trong chế độ speed
+                            className={`p-2.5 
                                 min-h-[42px] min-w-[42px]
                                 flex items-center justify-center
-                                bg-gray-100 hover:bg-gray-200 
-                                dark:bg-gray-700 dark:hover:bg-gray-600 
+                                ${mode.speed
+                                    ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed opacity-50'
+                                    : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                                }
                                 text-gray-600 dark:text-gray-300
                                 rounded-xl border border-gray-200 dark:border-gray-600
                                 transition-all duration-200
-                                group relative"
-                            title="Tải ảnh và tài liệu"
+                                group relative`}
+                            title={mode.speed ? "Không thể tải lên trong chế độ nhanh" : "Tải ảnh và tài liệu"}
                         >
                             <FontAwesomeIcon
                                 icon={faFileImport}
-                                className="w-5 h-5 transform group-hover:scale-110 transition-transform"
+                                className={`w-5 h-5 transform ${!mode.speed && 'group-hover:scale-110'} transition-transform`}
                             />
                             <span
                                 className="absolute -top-10 left-1/2 -translate-x-1/2 
@@ -448,7 +470,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                                 whitespace-nowrap
                                 z-10"
                             >
-                                Tải lên
+                                {mode.speed ? "Không khả dụng trong chế độ nhanh" : "Tải lên"}
                             </span>
                         </button>
                     </div>
