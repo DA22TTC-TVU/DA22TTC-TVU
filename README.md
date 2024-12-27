@@ -1,4 +1,4 @@
-# DA22TTC-TVU.github.io 🚀
+# DA22TTC-TVU 🚀
 
 ## Giới thiệu 👋
 
