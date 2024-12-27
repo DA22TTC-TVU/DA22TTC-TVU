@@ -10,6 +10,7 @@ import { useTheme } from 'next-themes';
 import { ChatHistory, CodePreviewModalType, ImagePart, Message } from './types/chat';
 import Groq from 'groq-sdk';
 import Together from "together-ai";
+import ChatSidebar from './components/ChatSidebar';
 
 export default function ChatPage() {
     const [messages, setMessages] = useState<Message[]>([]);
@@ -493,6 +494,34 @@ export default function ChatPage() {
         }
     };
 
+    const updateMessage = (index: number, newContent: string) => {
+        // Cập nhật tin nhắn trong messages
+        setMessages(prev => prev.map((msg, i) =>
+            i === index ? { ...msg, content: newContent } : msg
+        ));
+
+        // Cập nhật tin nhắn trong history
+        const historyIndex = Math.floor(index / 2); // Vì mỗi cặp user-assistant là 2 tin nhắn
+        setChatHistory(prev => prev.map((msg, i) =>
+            i === historyIndex ? {
+                ...msg,
+                parts: [{ text: newContent }]
+            } : msg
+        ));
+    };
+
+    const clearChat = () => {
+        if (window.confirm('Bạn có chắc muốn xóa toàn bộ đoạn chat?')) {
+            setMessages([]);
+            setChatHistory([]);
+            setStreamingText('');
+            if (stopGenerating) {
+                stopGenerating();
+            }
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
         const checkMobile = () => {
             setIsMobile(window.innerWidth < 768); // md breakpoint của Tailwind
@@ -503,43 +532,80 @@ export default function ChatPage() {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
+    const handleNewChat = () => {
+        setMessages([]);
+        setChatHistory([]);
+        setStreamingText('');
+        if (stopGenerating) {
+            stopGenerating();
+        }
+        setIsLoading(false);
+    };
+
+    const handleSelectChat = (session: any) => {
+        setMessages(session.messages);
+        // Cập nhật chatHistory tương ứng nếu cần
+        const newHistory = session.messages.reduce((acc: any[], msg: any) => {
+            if (msg.role === 'user' || msg.role === 'assistant') {
+                acc.push({
+                    role: msg.role === 'assistant' ? 'model' : 'user',
+                    parts: [{ text: msg.content }]
+                });
+            }
+            return acc;
+        }, []);
+        setChatHistory(newHistory);
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
-            <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
-                <ChatHeader />
+            <div className="flex">
+                <ChatSidebar
+                    onNewChat={handleNewChat}
+                    onSelectChat={handleSelectChat}
+                    currentMessages={messages}
+                />
 
-                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-2 sm:p-4">
-                    <ChatMessages
-                        messages={messages}
-                        isLoading={isLoading}
-                        streamingText={streamingText}
-                        setCodePreview={setCodePreview}
-                        isMobile={isMobile}
-                        setInput={setInput}
-                        regenerateMessage={regenerateMessage}
-                        deleteMessage={deleteMessage}
-                    />
+                <div className="flex-1">
+                    <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
+                        <ChatHeader />
 
-                    <ChatInput
-                        input={input}
-                        setInput={setInput}
-                        isLoading={isLoading}
-                        handleSubmit={handleSubmit}
-                        imagePreviews={imagePreviews}
-                        filePreviews={filePreviews}
-                        handleRemoveImage={handleRemoveImage}
-                        handleRemoveFile={handleRemoveFile}
-                        selectedImages={selectedImages}
-                        setSelectedImages={setSelectedImages}
-                        setImagePreviews={setImagePreviews}
-                        selectedFiles={selectedFiles}
-                        setSelectedFiles={setSelectedFiles}
-                        setFilePreviews={setFilePreviews}
-                        fileInputKey={fileInputKey}
-                        mode={mode}
-                        setMode={setMode}
-                        stopGenerating={stopGenerating}
-                    />
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-2 sm:p-4">
+                            <ChatMessages
+                                messages={messages}
+                                isLoading={isLoading}
+                                streamingText={streamingText}
+                                setCodePreview={setCodePreview}
+                                isMobile={isMobile}
+                                setInput={setInput}
+                                regenerateMessage={regenerateMessage}
+                                deleteMessage={deleteMessage}
+                                updateMessage={updateMessage}
+                            />
+
+                            <ChatInput
+                                input={input}
+                                setInput={setInput}
+                                isLoading={isLoading}
+                                handleSubmit={handleSubmit}
+                                imagePreviews={imagePreviews}
+                                filePreviews={filePreviews}
+                                handleRemoveImage={handleRemoveImage}
+                                handleRemoveFile={handleRemoveFile}
+                                selectedImages={selectedImages}
+                                setSelectedImages={setSelectedImages}
+                                setImagePreviews={setImagePreviews}
+                                selectedFiles={selectedFiles}
+                                setSelectedFiles={setSelectedFiles}
+                                setFilePreviews={setFilePreviews}
+                                fileInputKey={fileInputKey}
+                                mode={mode}
+                                setMode={setMode}
+                                stopGenerating={stopGenerating}
+                                clearChat={clearChat}
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
 

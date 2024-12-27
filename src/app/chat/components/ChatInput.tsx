@@ -3,7 +3,7 @@
 import { useRef, FormEvent, ClipboardEvent, useEffect, useCallback, useMemo } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFileImport, faGear } from '@fortawesome/free-solid-svg-icons';
+import { faFileImport, faGear, faTrashCan } from '@fortawesome/free-solid-svg-icons';
 import { SUPPORTED_FILE_TYPES } from '../types/chat';
 import { toast } from 'react-hot-toast';
 import { useState } from 'react';
@@ -36,6 +36,7 @@ interface ChatInputProps {
         image: boolean;
     }>>;
     stopGenerating: (() => void) | null;
+    clearChat: () => void;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
@@ -56,7 +57,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
     fileInputKey,
     mode,
     setMode,
-    stopGenerating
+    stopGenerating,
+    clearChat
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [imageLoadingStates, setImageLoadingStates] = useState<boolean[]>([]);
@@ -370,6 +372,37 @@ const ChatInput: React.FC<ChatInputProps> = ({
             <div className="flex flex-col space-y-2">
                 <div className="flex flex-col sm:flex-row sm:items-end space-y-2 sm:space-y-0 sm:space-x-2">
                     <div className="flex space-x-2 justify-start sm:justify-normal">
+                        <button
+                            type="button"
+                            onClick={clearChat}
+                            className="p-2.5 
+                                min-h-[42px] min-w-[42px]
+                                flex items-center justify-center
+                                bg-gray-100 hover:bg-gray-200 
+                                dark:bg-gray-700 dark:hover:bg-gray-600 
+                                text-gray-600 dark:text-gray-300
+                                rounded-xl border border-gray-200 dark:border-gray-600
+                                transition-all duration-200
+                                group relative"
+                            title="Xóa toàn bộ đoạn chat"
+                        >
+                            <FontAwesomeIcon
+                                icon={faTrashCan}
+                                className="w-5 h-5 transform group-hover:scale-110 transition-transform"
+                            />
+                            <span
+                                className="absolute -top-10 left-1/2 -translate-x-1/2 
+                                px-2 py-1 rounded-lg text-xs font-medium
+                                bg-gray-800 dark:bg-gray-700 text-white
+                                opacity-0 group-hover:opacity-100
+                                transition-opacity duration-200
+                                whitespace-nowrap
+                                z-10"
+                            >
+                                Xóa toàn bộ
+                            </span>
+                        </button>
+
                         <div className="relative group">
                             <button
                                 type="button"

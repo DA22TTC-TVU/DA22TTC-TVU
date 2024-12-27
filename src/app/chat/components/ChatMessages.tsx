@@ -1,14 +1,15 @@
 // ChatMessages.tsx
 'use client'
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCopy, faPlay, faCode, faArrowUp, faRotate, faTrash, faDownload } from '@fortawesome/free-solid-svg-icons';
+import { faCopy, faPlay, faCode, faArrowUp, faRotate, faTrash, faDownload, faPen } from '@fortawesome/free-solid-svg-icons';
 import { toast } from 'react-hot-toast';
 import { Message, CodePreviewModalType } from '../types/chat';
+import TextareaAutosize from 'react-textarea-autosize';
 
 interface ChatMessagesProps {
     messages: Message[];
@@ -19,6 +20,7 @@ interface ChatMessagesProps {
     setInput: any;
     regenerateMessage: (index: number) => void;
     deleteMessage: (index: number) => void;
+    updateMessage: (index: number, content: string) => void;
 }
 
 const ChatMessages: React.FC<ChatMessagesProps> = ({
@@ -29,10 +31,13 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
     isMobile,
     setInput,
     regenerateMessage,
-    deleteMessage
+    deleteMessage,
+    updateMessage
 }) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const streamEndRef = useRef<HTMLDivElement>(null);
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    const [editingContent, setEditingContent] = useState('');
 
     useEffect(() => {
         if (streamingText) {
@@ -60,6 +65,24 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
 
     const handleSuggestionClick = (message: string) => {
         setInput(message);
+    };
+
+    const handleEditStart = (index: number, content: string) => {
+        setEditingIndex(index);
+        setEditingContent(content);
+    };
+
+    const handleEditSave = (index: number) => {
+        if (editingContent.trim() !== '') {
+            updateMessage(index, editingContent);
+        }
+        setEditingIndex(null);
+        setEditingContent('');
+    };
+
+    const handleEditCancel = () => {
+        setEditingIndex(null);
+        setEditingContent('');
     };
 
     return (
@@ -104,8 +127,8 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                             id={`message-${index}`}
                             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} group`}
                         >
-                            <div className={`${message.role === 'user' ? 'mx-2' : 'w-full'} `}>
-                                <div className={`p-2.5 sm:p-4 ${message.role === 'user'
+                            <div className={`${message.role === 'user' && editingIndex !== index ? 'mx-2' : 'w-full'}`}>
+                                <div className={`p-2.5 sm:p-4 ${message.role === 'user' && editingIndex !== index
                                     ? 'bg-blue-500 text-white rounded-xl'
                                     : 'text-gray-900 dark:text-white'
                                     }`}>
@@ -192,93 +215,130 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                     ))}
 
                                     {message.content && (
-                                        <ReactMarkdown
-                                            className="prose dark:prose-invert max-w-none text-sm sm:text-base break-words"
-                                            remarkPlugins={[remarkGfm]}
-                                            components={{
-                                                code({ inline, className, children, ...props }: {
-                                                    inline?: boolean;
-                                                    className?: string;
-                                                    children?: React.ReactNode;
-                                                }) {
-                                                    const match = /language-(\w+)/.exec(className || '');
-                                                    return !inline && match ? (
-                                                        <div className="relative">
-                                                            <div className="absolute -top-2 right-0 flex gap-2 z-10">
-                                                                {(match[1] === 'javascript' || match[1] === 'js' || match[1] === 'python' || match[1] === 'py' || match[1] === 'html') && (
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            const code = String(children).replace(/\n$/, '');
-                                                                            setCodePreview({
-                                                                                isOpen: true,
-                                                                                content: code,
-                                                                                originalCode: code,
-                                                                                isFullscreen: isMobile,
-                                                                                mode: 'edit',
-                                                                                language: match[1]
-                                                                            });
-                                                                        }}
-                                                                        className="p-2 bg-gray-700 hover:bg-gray-600 
-                                                                            text-gray-100 dark:text-gray-200
-                                                                            rounded-lg transition-colors 
-                                                                            flex items-center gap-2 text-sm"
-                                                                    >
-                                                                        <FontAwesomeIcon
-                                                                            icon={match[1] === 'html' ? faCode : faPlay}
-                                                                            className="w-4 h-4"
-                                                                        />
-                                                                        <span>{match[1] === 'html' ? 'Xem' : 'Chạy'}</span>
-                                                                    </button>
-                                                                )}
+                                        <>
+                                            {editingIndex === index ? (
+                                                <div className={`relative ${message.role === 'user' ? 'w-full' : 'w-full'}`}>
+                                                    <TextareaAutosize
+                                                        value={editingContent}
+                                                        onChange={(e) => setEditingContent(e.target.value)}
+                                                        className={`w-full p-2 
+                                                            ${message.role === 'user'
+                                                                ? 'bg-transparent light:text-gray-900'
+                                                                : 'bg-gray-50 dark:bg-gray-700'
+                                                            }
+                                                            border border-gray-200 dark:border-gray-600 
+                                                            rounded-lg resize-none focus:outline-none
+                                                            focus:ring-2 focus:ring-blue-500`}
+                                                        minRows={2}
+                                                        autoFocus
+                                                    />
+                                                    <div className="flex gap-2 mt-2">
+                                                        <button
+                                                            onClick={() => handleEditSave(index)}
+                                                            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 
+                                                                    text-white rounded-lg text-sm"
+                                                        >
+                                                            Lưu
+                                                        </button>
+                                                        <button
+                                                            onClick={handleEditCancel}
+                                                            className="px-3 py-1 bg-gray-500 hover:bg-gray-600 
+                                                                    text-white rounded-lg text-sm"
+                                                        >
+                                                            Hủy
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <ReactMarkdown
+                                                    className="prose dark:prose-invert max-w-none text-sm sm:text-base break-words"
+                                                    remarkPlugins={[remarkGfm]}
+                                                    components={{
+                                                        code({ inline, className, children, ...props }: {
+                                                            inline?: boolean;
+                                                            className?: string;
+                                                            children?: React.ReactNode;
+                                                        }) {
+                                                            const match = /language-(\w+)/.exec(className || '');
+                                                            return !inline && match ? (
+                                                                <div className="relative">
+                                                                    <div className="absolute -top-2 right-0 flex gap-2 z-10">
+                                                                        {(match[1] === 'javascript' || match[1] === 'js' || match[1] === 'python' || match[1] === 'py' || match[1] === 'html') && (
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    const code = String(children).replace(/\n$/, '');
+                                                                                    setCodePreview({
+                                                                                        isOpen: true,
+                                                                                        content: code,
+                                                                                        originalCode: code,
+                                                                                        isFullscreen: isMobile,
+                                                                                        mode: 'edit',
+                                                                                        language: match[1]
+                                                                                    });
+                                                                                }}
+                                                                                className="p-2 bg-gray-700 hover:bg-gray-600 
+                                                                                    text-gray-100 dark:text-gray-200
+                                                                                    rounded-lg transition-colors 
+                                                                                    flex items-center gap-2 text-sm"
+                                                                            >
+                                                                                <FontAwesomeIcon
+                                                                                    icon={match[1] === 'html' ? faCode : faPlay}
+                                                                                    className="w-4 h-4"
+                                                                                />
+                                                                                <span>{match[1] === 'html' ? 'Xem' : 'Chạy'}</span>
+                                                                            </button>
+                                                                        )}
 
-                                                                <button
-                                                                    onClick={() => copyToClipboard(String(children))}
-                                                                    className="p-2 bg-gray-700 rounded-lg 
-                                                                        hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm"
-                                                                >
-                                                                    <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-4 h-4" />
-                                                                </button>
-                                                            </div>
-                                                            <SyntaxHighlighter
-                                                                {...props}
-                                                                style={atomDark}
-                                                                language={match[1]}
-                                                                PreTag="div"
-                                                                className="rounded-lg"
+                                                                        <button
+                                                                            onClick={() => copyToClipboard(String(children))}
+                                                                            className="p-2 bg-gray-700 rounded-lg 
+                                                                                    hover:bg-gray-600 transition-colors flex items-center gap-2 text-sm"
+                                                                        >
+                                                                            <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-4 h-4" />
+                                                                        </button>
+                                                                    </div>
+                                                                    <SyntaxHighlighter
+                                                                        {...props}
+                                                                        style={atomDark}
+                                                                        language={match[1]}
+                                                                        PreTag="div"
+                                                                        className="rounded-lg"
+                                                                    >
+                                                                        {String(children).replace(/\n$/, '')}
+                                                                    </SyntaxHighlighter>
+                                                                </div>
+                                                            ) : (
+                                                                <code {...props} className={className}>
+                                                                    {children}
+                                                                </code>
+                                                            );
+                                                        },
+                                                        // Tùy chỉnh các thẻ markdown khác
+                                                        p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
+                                                        ul: ({ children }) => <ul className="list-disc pl-4 mb-4 last:mb-0">{children}</ul>,
+                                                        ol: ({ children }) => <ol className="list-decimal pl-4 mb-4 last:mb-0">{children}</ol>,
+                                                        li: ({ children }) => <li className="mb-1">{children}</li>,
+                                                        a: ({ children, href }) => (
+                                                            <a
+                                                                href={href}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-blue-400 hover:text-blue-500 underline"
                                                             >
-                                                                {String(children).replace(/\n$/, '')}
-                                                            </SyntaxHighlighter>
-                                                        </div>
-                                                    ) : (
-                                                        <code {...props} className={className}>
-                                                            {children}
-                                                        </code>
-                                                    );
-                                                },
-                                                // Tùy chỉnh các thẻ markdown khác
-                                                p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
-                                                ul: ({ children }) => <ul className="list-disc pl-4 mb-4 last:mb-0">{children}</ul>,
-                                                ol: ({ children }) => <ol className="list-decimal pl-4 mb-4 last:mb-0">{children}</ol>,
-                                                li: ({ children }) => <li className="mb-1">{children}</li>,
-                                                a: ({ children, href }) => (
-                                                    <a
-                                                        href={href}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-400 hover:text-blue-500 underline"
-                                                    >
-                                                        {children}
-                                                    </a>
-                                                ),
-                                                blockquote: ({ children }) => (
-                                                    <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic">
-                                                        {children}
-                                                    </blockquote>
-                                                ),
-                                            }}
-                                        >
-                                            {message.content}
-                                        </ReactMarkdown>
+                                                                {children}
+                                                            </a>
+                                                        ),
+                                                        blockquote: ({ children }) => (
+                                                            <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic">
+                                                                {children}
+                                                            </blockquote>
+                                                        ),
+                                                    }}
+                                                >
+                                                    {message.content}
+                                                </ReactMarkdown>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                                 {(message.generatedImages?.[0]?.isLoading) || message.content !== 'Đang tạo ảnh...' && (
@@ -289,33 +349,40 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                                     const messageElement = document.getElementById(`message-${index}`);
                                                     messageElement?.scrollIntoView({ behavior: 'smooth' });
                                                 }}
-                                                className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
-                                                        hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                                className="opacity-0 group-hover:opacity-100 p-2 bg-gray-200 dark:bg-gray-700 rounded-lg 
+                                                        hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
                                             >
-                                                <FontAwesomeIcon icon={faArrowUp} className="text-gray-300 w-3 h-3" />
+                                                <FontAwesomeIcon icon={faArrowUp} className="text-gray-500 dark:text-gray-300 w-3 h-3" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleEditStart(index, message.content)}
+                                                className="opacity-0 group-hover:opacity-100 p-2 bg-gray-200 dark:bg-gray-700 rounded-lg 
+                                                        hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                            >
+                                                <FontAwesomeIcon icon={faPen} className="text-gray-500 dark:text-gray-300 w-3 h-3" />
                                             </button>
                                             {message.role === 'assistant' && (
                                                 <button
                                                     onClick={() => regenerateMessage(index)}
-                                                    className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
-                                                            hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                                    className="opacity-0 group-hover:opacity-100 p-2 bg-gray-200 dark:bg-gray-700 rounded-lg 
+                                                            hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
                                                 >
-                                                    <FontAwesomeIcon icon={faRotate} className="text-gray-300 w-3 h-3" />
+                                                    <FontAwesomeIcon icon={faRotate} className="text-gray-500 dark:text-gray-300 w-3 h-3" />
                                                 </button>
                                             )}
                                             <button
                                                 onClick={() => copyToClipboard(message.content)}
-                                                className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
-                                                        hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                                className="opacity-0 group-hover:opacity-100 p-2 bg-gray-200 dark:bg-gray-700 rounded-lg 
+                                                        hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
                                             >
-                                                <FontAwesomeIcon icon={faCopy} className="text-gray-300 w-3 h-3" />
+                                                <FontAwesomeIcon icon={faCopy} className="text-gray-500 dark:text-gray-300 w-3 h-3" />
                                             </button>
                                             <button
                                                 onClick={() => deleteMessage(index)}
-                                                className="opacity-0 group-hover:opacity-100 p-2 bg-gray-700 rounded-lg 
-                                                        hover:bg-red-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                                className="opacity-0 group-hover:opacity-100 p-2 bg-gray-200 dark:bg-gray-700 rounded-lg 
+                                                        hover:bg-red-300 dark:hover:bg-red-600 transition-all duration-200 flex items-center gap-2 text-sm"
                                             >
-                                                <FontAwesomeIcon icon={faTrash} className="text-gray-300 w-3 h-3" />
+                                                <FontAwesomeIcon icon={faTrash} className="text-gray-500 dark:text-gray-300 w-3 h-3" />
                                             </button>
                                         </div>
                                     </div>

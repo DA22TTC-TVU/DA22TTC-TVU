@@ -17,6 +17,7 @@
     "@google/generative-ai": "^0.21.0",
     "@gsap/react": "^2.1.1",
     "@headlessui/react": "^2.2.0",
+    "@heroicons/react": "^2.2.0",
     "@monaco-editor/react": "^4.6.0",
     "agora-rtc-sdk-ng": "^4.23.0",
     "animejs": "^3.2.2",
