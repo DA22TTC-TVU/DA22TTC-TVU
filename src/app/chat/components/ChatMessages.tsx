@@ -53,7 +53,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
             if (stripMarkdown) {
                 // Loại bỏ các ký hiệu markdown phổ biến
                 finalText = text
-                    .replace(/```[\s\S]*?```/g, '') // Xóa code blocks
+                    .replace(/```/g, '') // Xóa markdown code blocks
                     .replace(/`([^`]+)`/g, '$1') // Xóa inline code
                     .replace(/\*\*([^*]+)\*\*/g, '$1') // Xóa bold
                     .replace(/\*([^*]+)\*/g, '$1') // Xóa italic
@@ -357,7 +357,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                 </div>
                                 {(message.generatedImages?.[0]?.isLoading) || message.content !== 'Đang tạo ảnh...' && (
                                     <div className={`flex mt-1 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className="flex gap-2 absolute">
+                                        <div className={`flex gap-2 ${message.role === 'user' ? 'absolute' : ''}`}>
                                             <button
                                                 onClick={() => {
                                                     const messageElement = document.getElementById(`message-${index}`);
