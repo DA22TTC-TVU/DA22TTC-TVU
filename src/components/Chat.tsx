@@ -21,7 +21,6 @@ export default function Chat() {
     }[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const [unreadCount, setUnreadCount] = useState(0);
     const [lastSeenTimestamp, setLastSeenTimestamp] = useState(Date.now());
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -38,7 +37,6 @@ export default function Chat() {
     const [trendingLoading, setTrendingLoading] = useState(false);
     const [gifOffset, setGifOffset] = useState(0);
     const [hasMoreGifs, setHasMoreGifs] = useState(true);
-    const [loadingMore, setLoadingMore] = useState(false);
     const gifLimit = 10;
 
     const scrollToBottom = () => {
@@ -51,9 +49,6 @@ export default function Chat() {
 
     useEffect(() => {
         let isMounted = true;
-
-        // Reset unreadCount về 0 khi thay đổi trạng thái modal
-        setUnreadCount(0);
 
         if (isChatOpen) {
             const setupChat = async () => {
@@ -75,15 +70,12 @@ export default function Chat() {
                                 content: msg.content,
                             }));
 
-                            // Sắp xếp trước khi set state
                             const sortedMessages = [...messageList].sort((a, b) => b.timestamp - a.timestamp);
 
-                            // Kiểm tra nếu có sự thay đổi thực sự
                             if (JSON.stringify(sortedMessages) !== JSON.stringify(messages)) {
                                 setMessages(sortedMessages);
                             }
                         } else {
-                            // Chỉ set empty array nếu hiện tại có messages
                             if (messages.length > 0) {
                                 setMessages([]);
                             }
@@ -103,36 +95,6 @@ export default function Chat() {
             };
 
             setupChat();
-        } else {
-            const countUnreadMessages = async () => {
-                try {
-                    const database = await getDatabaseInstance();
-                    const messagesRef = ref(database, 'messages');
-
-                    const unsubscribe = onValue(messagesRef, (snapshot) => {
-                        if (!isMounted) return;
-
-                        const data = snapshot.val();
-                        if (data) {
-                            const messageList = Object.entries(data).map(([id, msg]: [string, any]) => ({
-                                timestamp: msg.timestamp
-                            }));
-                            const unread = messageList.filter(msg => msg.timestamp > lastSeenTimestamp).length;
-
-                            // Chỉ cập nhật nếu có sự thay đổi
-                            if (unread !== unreadCount) {
-                                setUnreadCount(unread);
-                            }
-                        }
-                    });
-
-                    return () => unsubscribe();
-                } catch (error) {
-                    console.error("Error counting unread messages:", error);
-                }
-            };
-
-            countUnreadMessages();
         }
 
         return () => {
@@ -204,26 +166,6 @@ export default function Chat() {
             setHasMoreGifs(false);
         } finally {
             setGifSearchLoading(false);
-        }
-    };
-
-    const loadMoreGifs = async () => {
-        if (!hasMoreGifs || loadingMore) return;
-        setLoadingMore(true);
-        try {
-            if (gifSearchTerm) {
-                await handleGifSearch(gifSearchTerm, gifOffset);
-            } else {
-                const { data } = await gf.trending({ limit: gifLimit, offset: gifOffset });
-                setTrendingGifs(prev => [...prev, ...data]);
-                setHasMoreGifs(data.length === gifLimit);
-                setGifOffset(gifOffset + gifLimit);
-            }
-        } catch (error) {
-            console.error("Error loading more GIFs:", error);
-            setHasMoreGifs(false);
-        } finally {
-            setLoadingMore(false);
         }
     };
 
@@ -408,11 +350,6 @@ export default function Chat() {
                                             text-blue-600 dark:text-blue-400 rounded">Beta</span>
                     </span>
                 </div>
-                {unreadCount > 0 && (
-                    <span className="bg-red-500 text-white px-2 py-1 rounded-full text-xs">
-                        {unreadCount}
-                    </span>
-                )}
             </button>
             {/* Chat Modal */}
             {isChatOpen && createPortal(
@@ -448,9 +385,12 @@ export default function Chat() {
                                     >
                                         <div className={`max-w-[70%] ${msg.sender === userId ? 'order-1' : 'order-2'}`}>
                                             <div className={`p-3 rounded-2xl shadow-sm
-                                                ${msg.sender === userId
+                                                ${msg.sender === userId && msg.type === 'text'
                                                     ? 'bg-blue-500 text-white'
-                                                    : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200'}`}
+                                                    : msg.sender !== userId && msg.type === 'text'
+                                                        ? 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200'
+                                                        : ''
+                                                }`}
                                             >
                                                 {msg.type === 'text' && (
                                                     <div className="text-[15px] leading-relaxed">

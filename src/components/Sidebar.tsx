@@ -1,8 +1,6 @@
 'use client'
 import React from 'react';
 import { DriveInfo } from '../types';
-import { getDatabaseInstance } from '../lib/firebaseConfig';
-import { ref, onValue } from 'firebase/database';
 import dynamic from 'next/dynamic';
 import Chat from './Chat';
 import QA from './QA';
@@ -33,22 +31,7 @@ interface SidebarProps {
 
 export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUploadFolder, formatBytes, isOpen, onClose, fileInputRef, isLoading = false }: SidebarProps) {
     const folderInputRef = React.useRef<HTMLInputElement>(null);
-    const [streamCount, setStreamCount] = React.useState(0);
     const [isModalOpen, setIsModalOpen] = React.useState(false);
-
-    React.useEffect(() => {
-        const listenToStreams = async () => {
-            const db = await getDatabaseInstance();
-            const streamsRef = ref(db, 'streams');
-
-            onValue(streamsRef, (snapshot) => {
-                const data = snapshot.val();
-                setStreamCount(data ? Object.keys(data).length : 0);
-            });
-        };
-
-        listenToStreams();
-    }, []);
 
     const handleCreateFolder = () => {
         onClose();
@@ -192,11 +175,6 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
                                 onClick={() => setIsModalOpen(true)}
                             >
                                 <Broadcast isModalOpen={isModalOpen} setIsModalOpen={setIsModalOpen} />
-                                {streamCount > 0 && (
-                                    <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs">
-                                        {streamCount}
-                                    </span>
-                                )}
                             </div>
                             <QA />
                             <Notification />

@@ -4,7 +4,10 @@ import { createPortal } from 'react-dom';
 import AgoraRTC from 'agora-rtc-sdk-ng';
 import { toast } from 'react-hot-toast';
 import { getDatabaseInstance } from '../lib/firebaseConfig';
-import { ref, onValue, set, remove } from 'firebase/database';
+import { ref, set, remove } from 'firebase/database';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCopy } from '@fortawesome/free-solid-svg-icons';
+import { useRouter } from 'next/navigation';
 
 const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
@@ -15,14 +18,13 @@ interface BroadcastProps {
 }
 
 export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProps) {
-    const [streams, setStreams] = useState<Array<{ id: string, name: string, timestamp: number }>>([]);
+    const router = useRouter();
     const [isSharing, setIsSharing] = useState(false);
     const [myStreamId, setMyStreamId] = useState('');
     const [agoraAppId, setAgoraAppId] = useState('');
     const [isLoading, setIsLoading] = useState(true);
-    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-    const [password, setPassword] = useState('');
     const [isStarting, setIsStarting] = useState(false);
+    const [joinCode, setJoinCode] = useState('');
 
     useEffect(() => {
         const getCredentials = async () => {
@@ -45,47 +47,27 @@ export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProp
     }, []);
 
     useEffect(() => {
-        const listenToStreams = async () => {
-            const db = await getDatabaseInstance();
-            const streamsRef = ref(db, 'streams');
-
-            return onValue(streamsRef, (snapshot) => {
-                const data = snapshot.val();
-                if (data) {
-                    const streamList = Object.entries(data).map(([id, stream]: [string, any]) => ({
-                        id,
-                        name: stream.name,
-                        timestamp: stream.timestamp
-                    }));
-                    // Sắp xếp theo thời gian mới nhất
-                    streamList.sort((a, b) => b.timestamp - a.timestamp);
-                    setStreams(streamList);
-                } else {
-                    setStreams([]);
-                }
-            });
-        };
-
-        const unsubscribe = listenToStreams();
-
-        // Cleanup function
-        return () => {
-            if (unsubscribe) {
-                unsubscribe.then(unsub => unsub());
+        // Thêm event listener để xử lý khi người dùng rời trang
+        const handleBeforeUnload = async () => {
+            if (myStreamId) {
+                const db = await getDatabaseInstance();
+                await remove(ref(db, `streams/${myStreamId}`));
             }
         };
-    }, []); // Chỉ chạy một lần khi component mount
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        return () => {
+            // Cleanup khi component unmount
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            // Đảm bảo dừng stream và xóa dữ liệu Firebase khi unmount
+            if (isSharing) {
+                stopSharing();
+            }
+        };
+    }, [myStreamId, isSharing]);
 
     const handleStartSharing = async () => {
-        setIsPasswordModalOpen(true);
-    };
-
-    const startSharingWithPassword = async () => {
-        if (!password.trim()) {
-            toast.error('Vui lòng nhập mật khẩu!');
-            return;
-        }
-
         setIsStarting(true);
         try {
             const streamId = Math.random().toString(36).substring(7);
@@ -101,17 +83,15 @@ export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProp
 
             await client.publish(screenTrack);
 
-            // Lưu thông tin stream và mật khẩu vào Firebase
+            // Lưu thông tin stream vào Firebase
             const db = await getDatabaseInstance();
             await set(ref(db, `streams/${streamId}`), {
                 name: 'Màn hình của ' + streamId,
-                timestamp: Date.now(),
-                password: password
+                timestamp: Date.now()
             });
 
             setIsSharing(true);
-            setIsPasswordModalOpen(false);
-            toast.success('Bắt đầu chia sẻ màn hình!');
+            toast.success('Bắt đầu chia sẻ màn hình! Mã phát: ' + streamId);
 
             // Xử lý khi người dùng dừng chia sẻ từ UI Chrome
             const track = Array.isArray(screenTrack) ? screenTrack[0] : screenTrack;
@@ -179,6 +159,13 @@ export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProp
         }
     };
 
+    const handleJoinStream = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!joinCode.trim()) return;
+
+        router.push(`screen-share/view/${joinCode.trim()}`);
+    };
+
     return (
         <>
             {isLoading ? (
@@ -202,69 +189,19 @@ export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProp
                 </div>
             )}
 
-            {/* Password Modal */}
-            {isPasswordModalOpen && createPortal(
-                <div
-                    className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[9999] flex items-center justify-center"
-                    onClick={() => setIsPasswordModalOpen(false)}
-                >
-                    <div
-                        className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl w-full max-w-md mx-4"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                                Đặt mật khẩu cho buổi phát
-                            </h2>
-                            <button
-                                onClick={() => setIsPasswordModalOpen(false)}
-                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600
-                                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white mb-4"
-                            placeholder="Nhập mật khẩu..."
-                        />
-                        <button
-                            onClick={startSharingWithPassword}
-                            disabled={isStarting || !password}
-                            className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg
-                                     hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isStarting ? 'Đang bắt đầu...' : 'Bắt đầu phát sóng'}
-                        </button>
-                    </div>
-                </div>,
-                document.body
-            )}
-
             {/* Main Modal Content */}
             {isModalOpen && createPortal(
-                <div
-                    className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[9999] flex items-center justify-center"
-                    onClick={() => setIsModalOpen(false)}
-                >
-                    <div
-                        className="bg-white dark:bg-gray-800 w-full max-w-lg mx-4 rounded-2xl shadow-xl"
-                        onClick={(e) => e.stopPropagation()}
-                    >
+                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[9999] flex items-center justify-center"
+                    onClick={() => setIsModalOpen(false)}>
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-lg mx-4 rounded-2xl shadow-xl"
+                        onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
                         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
                                 Phát Sóng
                             </h3>
-                            <button
-                                onClick={() => setIsModalOpen(false)}
-                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                            >
+                            <button onClick={() => setIsModalOpen(false)}
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
@@ -272,14 +209,52 @@ export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProp
                         </div>
 
                         {/* Content */}
-                        <div className="p-4">
-                            {/* Nút chia sẻ màn hình */}
+                        <div className="p-4 space-y-6">
+                            {/* Form nhập mã phát */}
+                            <form onSubmit={handleJoinStream} className="space-y-4">
+                                <div>
+                                    <label htmlFor="joinCode"
+                                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Nhập mã phát để xem
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            id="joinCode"
+                                            value={joinCode}
+                                            onChange={(e) => setJoinCode(e.target.value)}
+                                            placeholder="Nhập mã phát..."
+                                            className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 
+                                                border border-gray-200 dark:border-gray-600 rounded-lg 
+                                                focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={!joinCode.trim()}
+                                            className="px-4 py-2 bg-blue-500 text-white rounded-lg
+                                                hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed
+                                                transition-colors"
+                                        >
+                                            Xem
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
+                                </div>
+                                <div className="relative flex justify-center text-sm">
+                                    <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">hoặc</span>
+                                </div>
+                            </div>
+
+                            {/* Phần chia sẻ màn hình */}
                             {!isSharing ? (
-                                <button
-                                    onClick={handleStartSharing}
-                                    className="w-full mb-4 px-4 py-2 bg-blue-500 text-white rounded-lg 
-                                    hover:bg-blue-600 transition-colors flex items-center justify-center space-x-2"
-                                >
+                                <button onClick={handleStartSharing}
+                                    className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg 
+                                    hover:bg-blue-600 transition-colors flex items-center justify-center space-x-2">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                             d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
@@ -287,52 +262,32 @@ export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProp
                                     <span>Chia Sẻ Màn Hình</span>
                                 </button>
                             ) : (
-                                <button
-                                    onClick={stopSharing}
-                                    className="w-full mb-4 px-4 py-2 bg-red-500 text-white rounded-lg 
-                                    hover:bg-red-600 transition-colors flex items-center justify-center space-x-2"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                    <span>Dừng Chia Sẻ</span>
-                                </button>
-                            )}
-
-                            {/* Danh sách stream */}
-                            <div className="space-y-2">
-                                <h4 className="font-medium text-gray-900 dark:text-gray-100">
-                                    Đang phát sóng
-                                </h4>
-                                {streams.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {streams.map(stream => (
-                                            <div
-                                                key={stream.id}
-                                                className="flex items-center justify-between p-3 bg-gray-50 
-                                                dark:bg-gray-700 rounded-lg"
-                                            >
-                                                <span className="text-gray-800 dark:text-gray-200">
-                                                    {stream.name}
-                                                </span>
-                                                <a
-                                                    href={`/screen-share/view/${stream.id}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="px-3 py-1 bg-blue-500 text-white rounded-lg 
-                                                    hover:bg-blue-600 transition-colors text-sm"
-                                                >
-                                                    Xem
-                                                </a>
-                                            </div>
-                                        ))}
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">Mã phát của bạn:</p>
+                                        <div className="flex items-center gap-2">
+                                            <code className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-600 rounded font-mono">
+                                                {myStreamId}
+                                            </code>
+                                            <button onClick={() => {
+                                                navigator.clipboard.writeText(myStreamId);
+                                                toast.success('Đã sao chép mã phát!');
+                                            }}
+                                                className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg">
+                                                <FontAwesomeIcon icon={faCopy} className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
-                                ) : (
-                                    <p className="text-gray-500 dark:text-gray-400 text-sm">
-                                        Chưa có luồng phát sóng nào
-                                    </p>
-                                )}
-                            </div>
+                                    <button onClick={stopSharing}
+                                        className="w-full px-4 py-2 bg-red-500 text-white rounded-lg 
+                                        hover:bg-red-600 transition-colors flex items-center justify-center space-x-2">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                        <span>Dừng Chia Sẻ</span>
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>,
