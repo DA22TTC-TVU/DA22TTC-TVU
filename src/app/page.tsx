@@ -7,6 +7,7 @@ import { DriveInfo, FileItem } from '../types';
 import { Dialog } from '@headlessui/react'
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { useTheme } from 'next-themes';
 
 interface FolderBreadcrumb {
@@ -633,6 +634,39 @@ export default function Home() {
     setIsAISearch(!isAISearch);
   };
 
+  const handleDelete = async (fileId: string) => {
+    try {
+      const response = await fetch(`/api/drive/delete?fileId=${fileId}`, {
+        method: 'DELETE',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Lỗi khi xóa file');
+      }
+
+      // Cập nhật lại danh sách files sau khi xóa
+      if (currentFolderId) {
+        const refreshResponse = await fetch(`/api/drive?folderId=${currentFolderId}`, {
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        const refreshData = await refreshResponse.json();
+        setFiles(sortFilesByType(refreshData.files));
+      } else {
+        const refreshResponse = await fetch('/api/drive', {
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        const refreshData = await refreshResponse.json();
+        setFiles(sortFilesByType(refreshData.files));
+      }
+    } catch (error) {
+      console.error('Lỗi khi xóa file:', error);
+      toast.error('Có lỗi xảy ra khi xóa file');
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-white dark:bg-gray-900">
       <Toaster
@@ -701,6 +735,7 @@ export default function Home() {
             onUploadFile={handleUploadFile}
             onUploadFolder={handleUploadFolder}
             onCheckFolderContent={checkFolderContent}
+            onDelete={handleDelete}
           />
         </div>
       </div>

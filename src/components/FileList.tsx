@@ -23,6 +23,7 @@ interface FileListProps {
     onUploadFile: (event: React.ChangeEvent<HTMLInputElement>) => void;
     onUploadFolder: (event: React.ChangeEvent<HTMLInputElement>) => void;
     onCheckFolderContent: (folderId: string) => Promise<boolean>;
+    onDelete?: (fileId: string) => Promise<void>;
 }
 
 function formatFileSize(bytes: number): string {
@@ -31,11 +32,6 @@ function formatFileSize(bytes: number): string {
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-}
-
-function getFileNameWithoutExtension(fileName: string): string {
-    const lastDotIndex = fileName.lastIndexOf('.');
-    return lastDotIndex === -1 ? fileName : fileName.substring(0, lastDotIndex);
 }
 
 function getFileExtension(fileName: string): string {
@@ -63,7 +59,8 @@ export default function FileList({
     onDownload,
     onUploadFile,
     onUploadFolder,
-    onCheckFolderContent
+    onCheckFolderContent,
+    onDelete,
 }: FileListProps) {
     const { theme } = useTheme();
 
@@ -143,6 +140,21 @@ export default function FileList({
 
     // Thêm state để quản lý menu đang mở
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+    // Thêm state cho modal xác nhận xóa
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deletePassword, setDeletePassword] = useState('');
+    const [fileToDelete, setFileToDelete] = useState<FileItem | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    // Thêm state kiểm tra admin mode
+    const [isAdminMode] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.has('admin');
+        }
+        return false;
+    });
 
     useEffect(() => {
         const checkFolders = async () => {
@@ -367,6 +379,44 @@ export default function FileList({
     // Thêm hàm xử lý đóng menu
     const handleMouseLeave = () => {
         setOpenMenuId(null);
+    };
+
+    // Thêm hàm xử lý xóa
+    const handleDelete = async (e: React.MouseEvent, file: FileItem) => {
+        e.stopPropagation();
+        setFileToDelete(file);
+        setShowDeleteModal(true);
+        setOpenMenuId(null);
+    };
+
+    // Thêm hàm xác nhận xóa
+    const confirmDelete = async () => {
+        if (!fileToDelete || !onDelete) return;
+
+        try {
+            setIsDeleting(true);
+            const response = await fetch('/api/drive/verify-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ password: deletePassword }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Mật khẩu không đúng');
+            }
+
+            await onDelete(fileToDelete.id);
+            toast.success('Đã xóa thành công!');
+            setShowDeleteModal(false);
+            setDeletePassword('');
+            setFileToDelete(null);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Có lỗi xảy ra');
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     return (
@@ -873,6 +923,29 @@ export default function FileList({
                                                                         </button>
                                                                     )}
                                                                 </Menu.Item>
+
+                                                                {/* Thêm dấu gạch ngang phân cách nếu có nút xóa */}
+                                                                {isAdminMode && (
+                                                                    <>
+                                                                        <div className="h-px bg-gray-200 dark:bg-gray-700 my-1"></div>
+                                                                        <Menu.Item>
+                                                                            {({ active }) => (
+                                                                                <button
+                                                                                    onClick={(e) => handleDelete(e, file)}
+                                                                                    className={`${active ? 'bg-red-50 dark:bg-red-900' : ''} 
+                                                                                        group flex w-full items-center px-4 py-2 text-sm
+                                                                                        text-red-600 dark:text-red-400 rounded-lg`}
+                                                                                >
+                                                                                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                                    </svg>
+                                                                                    Xóa vĩnh viễn
+                                                                                </button>
+                                                                            )}
+                                                                        </Menu.Item>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         </Menu.Items>
                                                     </Transition>
@@ -965,6 +1038,57 @@ export default function FileList({
                                     </pre>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Thêm modal xác nhận xóa vào cuối component, trước thẻ đóng div cuối cùng */}
+            {showDeleteModal && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center">
+                        <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+                            <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
+                        </div>
+
+                        <div className="inline-block w-full max-w-md p-6 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                                Xác nhận xóa vĩnh viễn
+                            </h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                                Bạn có chắc chắn muốn xóa &quot;{fileToDelete?.name}&quot;? Hành động này không thể hoàn tác.
+                            </p>
+                            <input
+                                type="password"
+                                placeholder="Nhập mật khẩu admin"
+                                value={deletePassword}
+                                onChange={(e) => setDeletePassword(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                                    focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 
+                                    dark:text-white mb-4"
+                            />
+                            <div className="flex justify-end space-x-3">
+                                <button
+                                    onClick={() => {
+                                        setShowDeleteModal(false);
+                                        setDeletePassword('');
+                                        setFileToDelete(null);
+                                    }}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 
+                                        hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    onClick={confirmDelete}
+                                    disabled={isDeleting || !deletePassword}
+                                    className={`px-4 py-2 text-sm font-medium text-white rounded-lg
+                                        ${isDeleting ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}
+                                    `}
+                                >
+                                    {isDeleting ? 'Đang xóa...' : 'Xóa'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
