@@ -16,45 +16,90 @@ interface ChatSidebarProps {
     isLoading: any;
 }
 
+// Thêm hàm helper để làm việc với IndexedDB
+const initDB = async () => {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('ChatDB', 1);
+
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+
+        request.onupgradeneeded = (event: any) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('chatSessions')) {
+                db.createObjectStore('chatSessions', { keyPath: 'id' });
+            }
+        };
+    });
+};
+
 export default function ChatSidebar({ onNewChat, onSelectChat, currentMessages, streamingText, isLoading }: ChatSidebarProps) {
     const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
     const [currentSessionId, setCurrentSessionId] = useState<string>('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     useEffect(() => {
-        // Load chat sessions từ localStorage khi component mount
-        const savedSessions = localStorage.getItem('chatSessions');
-        if (savedSessions) {
-            setChatSessions(JSON.parse(savedSessions));
-        }
+        // Load chat sessions từ IndexedDB khi component mount
+        const loadSessions = async () => {
+            try {
+                const db: any = await initDB();
+                const transaction = db.transaction(['chatSessions'], 'readonly');
+                const store = transaction.objectStore('chatSessions');
+                const request = store.getAll();
+
+                request.onsuccess = () => {
+                    const sessions = request.result;
+                    setChatSessions(sessions.sort((a: ChatSession, b: ChatSession) =>
+                        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    ));
+                };
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+            }
+        };
+
+        loadSessions();
     }, []);
 
     useEffect(() => {
-        // Chỉ lưu tin nhắn vào session hiện tại
-        if (currentMessages.length > 0) {
-            if (!currentSessionId) {
-                // Tạo session mới nếu chưa có
-                const newSession: ChatSession = {
-                    id: Date.now().toString(),
-                    title: getSessionTitle(currentMessages),
-                    createdAt: new Date().toISOString(),
-                    messages: currentMessages
-                };
-                setCurrentSessionId(newSession.id);
-                const updatedSessions = [newSession, ...chatSessions];
-                setChatSessions(updatedSessions);
-                localStorage.setItem('chatSessions', JSON.stringify(updatedSessions));
-            } else {
-                // Cập nhật session hiện tại
-                const updatedSessions = chatSessions.map(session =>
-                    session.id === currentSessionId
-                        ? { ...session, messages: currentMessages, title: getSessionTitle(currentMessages) }
-                        : session
-                );
-                setChatSessions(updatedSessions);
-                localStorage.setItem('chatSessions', JSON.stringify(updatedSessions));
+        // Lưu messages vào IndexedDB
+        const saveSession = async () => {
+            if (currentMessages.length > 0) {
+                try {
+                    const db: any = await initDB();
+                    const transaction = db.transaction(['chatSessions'], 'readwrite');
+                    const store = transaction.objectStore('chatSessions');
+
+                    if (!currentSessionId) {
+                        const newSession: ChatSession = {
+                            id: Date.now().toString(),
+                            title: getSessionTitle(currentMessages),
+                            createdAt: new Date().toISOString(),
+                            messages: currentMessages
+                        };
+                        setCurrentSessionId(newSession.id);
+                        store.add(newSession);
+                        setChatSessions(prev => [newSession, ...prev]);
+                    } else {
+                        const existingSession = chatSessions.find(s => s.id === currentSessionId);
+                        const updatedSession: ChatSession = {
+                            id: currentSessionId,
+                            title: getSessionTitle(currentMessages),
+                            messages: currentMessages,
+                            createdAt: existingSession?.createdAt ?? new Date().toISOString()
+                        };
+                        store.put(updatedSession);
+                        setChatSessions(prev => prev.map(session =>
+                            session.id === currentSessionId ? updatedSession : session
+                        ));
+                    }
+                } catch (error) {
+                    console.error('Error saving session:', error);
+                }
             }
-        }
+        };
+
+        saveSession();
     }, [currentMessages, currentSessionId]);
 
     const getSessionTitle = (messages: any[]) => {
@@ -65,15 +110,21 @@ export default function ChatSidebar({ onNewChat, onSelectChat, currentMessages, 
             'Cuộc trò chuyện mới';
     };
 
-    const deleteSession = (sessionId: string) => {
-        const updatedSessions = chatSessions.filter(s => s.id !== sessionId);
-        setChatSessions(updatedSessions);
-        localStorage.setItem('chatSessions', JSON.stringify(updatedSessions));
+    const deleteSession = async (sessionId: string) => {
+        try {
+            const db: any = await initDB();
+            const transaction = db.transaction(['chatSessions'], 'readwrite');
+            const store = transaction.objectStore('chatSessions');
+            store.delete(sessionId);
 
-        // Nếu xóa session hiện tại, tạo chat mới
-        if (sessionId === currentSessionId) {
-            setCurrentSessionId('');
-            onNewChat();
+            setChatSessions(prev => prev.filter(s => s.id !== sessionId));
+
+            if (sessionId === currentSessionId) {
+                setCurrentSessionId('');
+                onNewChat();
+            }
+        } catch (error) {
+            console.error('Error deleting session:', error);
         }
     };
 

@@ -74,10 +74,31 @@ const ChatInput: React.FC<ChatInputProps> = ({
     const [customModel, setCustomModel] = useState('');
 
     const availableModels = [
-        'deepseek-ai/DeepSeek-V3',
-        'Qwen/QwQ-32B-Preview',
-        'meta-llama/Llama-3.3-70B-Instruct',
-        'Qwen/Qwen2.5-Coder-32B-Instruct',
+        {
+            id: 'deepseek-ai/DeepSeek-V3',
+            name: 'DeepSeek V3',
+            type: 'text'
+        },
+        {
+            id: 'Qwen/QwQ-32B-Preview',
+            name: 'QwQ 32B',
+            type: 'text'
+        },
+        {
+            id: 'meta-llama/Llama-3.3-70B-Instruct',
+            name: 'Llama 3.3',
+            type: 'text'
+        },
+        {
+            id: 'Qwen/Qwen2.5-Coder-32B-Instruct',
+            name: 'Qwen Coder',
+            type: 'text'
+        },
+        {
+            id: 'FLUX.1-dev',
+            name: 'FLUX Dev',
+            type: 'image'
+        }
     ];
 
     const debouncedSetInput = useMemo(
@@ -597,50 +618,45 @@ const ChatInput: React.FC<ChatInputProps> = ({
                                     p-3 z-50"
                                     >
                                         <div className="space-y-2">
-                                            {availableModels.map((model) => (
+                                            <div className="mb-2 text-sm font-medium text-gray-500 dark:text-gray-400">Tạo văn bản</div>
+                                            {availableModels.filter(model => model.type === 'text').map((model) => (
                                                 <button
-                                                    key={model}
+                                                    key={model.id}
                                                     onClick={() => {
-                                                        setSelectedModel(model);
+                                                        setSelectedModel(model.id);
                                                         setShowModelSelector(false);
                                                     }}
                                                     className={`w-full text-left px-3 py-2 rounded-lg text-sm
-                                                        ${selectedModel === model
+                                                        ${selectedModel === model.id
                                                             ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400'
                                                             : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                                                         }
                                                         transition-colors duration-200`}
                                                 >
-                                                    {model}
+                                                    {model.name}
                                                 </button>
                                             ))}
-                                            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                                                <input
-                                                    type="text"
-                                                    value={customModel}
-                                                    onChange={(e) => setCustomModel(e.target.value)}
-                                                    placeholder="Nhập tên mô hình tùy chỉnh..."
-                                                    className="w-full px-3 py-2 text-sm
-                                                        bg-gray-50 dark:bg-gray-700
-                                                        border border-gray-200 dark:border-gray-600
-                                                        rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                />
+
+                                            <div className="my-2 border-t border-gray-200 dark:border-gray-700"></div>
+
+                                            <div className="mb-2 text-sm font-medium text-gray-500 dark:text-gray-400">Tạo ảnh</div>
+                                            {availableModels.filter(model => model.type === 'image').map((model) => (
                                                 <button
+                                                    key={model.id}
                                                     onClick={() => {
-                                                        if (customModel.trim()) {
-                                                            setSelectedModel(customModel.trim());
-                                                            setShowModelSelector(false);
-                                                            setCustomModel('');
-                                                        }
+                                                        setSelectedModel(model.id);
+                                                        setShowModelSelector(false);
                                                     }}
-                                                    className="w-full mt-2 px-3 py-2 text-sm
-                                                        bg-blue-500 hover:bg-blue-600
-                                                        text-white rounded-lg
-                                                        transition-colors duration-200"
+                                                    className={`w-full text-left px-3 py-2 rounded-lg text-sm
+                                                        ${selectedModel === model.id
+                                                            ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400'
+                                                            : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                        }
+                                                        transition-colors duration-200`}
                                                 >
-                                                    Sử dụng mô hình tùy chỉnh
+                                                    {model.name}
                                                 </button>
-                                            </div>
+                                            ))}
                                         </div>
                                     </div>
                                 )}

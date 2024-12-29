@@ -80,6 +80,14 @@ export default function ChatPage() {
         }
     };
 
+    const availableModels = [
+        { id: 'deepseek-ai/DeepSeek-V3', type: 'text' },
+        { id: 'Qwen/QwQ-32B-Preview', type: 'text' },
+        { id: 'meta-llama/Llama-3.3-70B-Instruct', type: 'text' },
+        { id: 'Qwen/Qwen2.5-Coder-32B-Instruct', type: 'text' },
+        { id: 'FLUX.1-dev', type: 'image' }
+    ];
+
     useEffect(() => {
         const initGroq = async () => {
             if (mode.speed && !groqModel) {
@@ -284,65 +292,140 @@ export default function ChatPage() {
         try {
             if (mode.experiment) {
                 try {
-                    setChatHistory(prev => [...prev, {
-                        role: 'user',
-                        parts: [{ text: userMessage }]
-                    }]);
+                    const selectedModelType = availableModels.find(m => m.id === selectedModel)?.type;
 
-                    setMessages(prev => [...prev, {
-                        role: 'user',
-                        content: userMessage
-                    }]);
+                    if (selectedModelType === 'image') {
+                        try {
+                            const userMessageIndex = messages.length;
 
-                    const apiResponse = await fetch('/api/drive/ai-search');
-                    const { hyperbolicApiKey } = await apiResponse.json();
-
-                    if (!hyperbolicApiKey) {
-                        throw new Error('Không tìm thấy Hyperbolic API key');
-                    }
-
-                    const currentModelConfig = modelConfigs[selectedModel as keyof typeof modelConfigs] || modelConfigs.default;
-
-                    const response = await fetch("https://api.hyperbolic.xyz/v1/chat/completions", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Authorization": `Bearer ${hyperbolicApiKey}`
-                        },
-                        body: JSON.stringify({
-                            messages: [
-                                ...chatHistory.map(msg => ({
-                                    role: msg.role === 'model' ? 'assistant' : msg.role,
-                                    content: msg.parts[0].text
-                                })),
+                            setMessages(prev => [
+                                ...prev,
                                 {
                                     role: 'user',
                                     content: userMessage
+                                },
+                                {
+                                    role: 'assistant',
+                                    content: 'Đang tạo ảnh...',
+                                    generatedImages: [{ base64: '', isLoading: true }]
                                 }
-                            ],
-                            model: selectedModel,
-                            max_tokens: currentModelConfig.max_tokens,
-                            temperature: currentModelConfig.temperature,
-                            top_p: currentModelConfig.top_p
-                        })
-                    });
+                            ]);
 
-                    if (!response.ok) {
-                        throw new Error('Lỗi khi gọi API Hyperbolic');
+                            const apiResponse = await fetch('/api/drive/ai-search');
+                            const { hyperbolicApiKey } = await apiResponse.json();
+
+                            if (!hyperbolicApiKey) {
+                                throw new Error('Không tìm thấy Hyperbolic API key');
+                            }
+
+                            const imagePromptResult = await model.chat.sendMessage([
+                                "Convert this message to an English image generation prompt, only return the prompt without any explanation: " + userMessage
+                            ]);
+                            const englishPrompt = imagePromptResult.response.text();
+
+                            const response = await fetch('https://api.hyperbolic.xyz/v1/image/generation', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${hyperbolicApiKey}`
+                                },
+                                body: JSON.stringify({
+                                    'model_name': selectedModel,
+                                    'prompt': englishPrompt,
+                                    'steps': 30,
+                                    'cfg_scale': 5,
+                                    'enable_refiner': false,
+                                    'height': 1024,
+                                    'width': 1024,
+                                    'backend': 'auto'
+                                })
+                            });
+
+                            if (!response.ok) {
+                                throw new Error('Lỗi khi gọi API Hyperbolic');
+                            }
+
+                            const result = await response.json();
+                            const imageBase64 = result.images[0].image;
+                            setMessages(prev => {
+                                const newMessages = [...prev];
+                                newMessages[newMessages.length - 1] = {
+                                    role: 'assistant',
+                                    content: 'Đây là ảnh của bạn!',
+                                    generatedImages: [{
+                                        base64: imageBase64,
+                                        isLoading: false
+                                    }]
+                                };
+                                return newMessages;
+                            });
+                        } catch (error) {
+                            console.error('Lỗi khi tạo ảnh:', error);
+                            setMessages(prev => prev.slice(0, -2));
+                            toast.error('Có lỗi xảy ra khi tạo ảnh. Vui lòng thử lại sau.');
+                        }
+                    } else {
+                        // Xử lý tạo văn bản với các model khác (giữ nguyên code cũ)
+                        setChatHistory(prev => [...prev, {
+                            role: 'user',
+                            parts: [{ text: userMessage }]
+                        }]);
+
+                        setMessages(prev => [...prev, {
+                            role: 'user',
+                            content: userMessage
+                        }]);
+
+                        const apiResponse = await fetch('/api/drive/ai-search');
+                        const { hyperbolicApiKey } = await apiResponse.json();
+
+                        if (!hyperbolicApiKey) {
+                            throw new Error('Không tìm thấy Hyperbolic API key');
+                        }
+
+                        const currentModelConfig = modelConfigs[selectedModel as keyof typeof modelConfigs] || modelConfigs.default;
+
+                        const response = await fetch("https://api.hyperbolic.xyz/v1/chat/completions", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                "Authorization": `Bearer ${hyperbolicApiKey}`
+                            },
+                            body: JSON.stringify({
+                                messages: [
+                                    ...chatHistory.map(msg => ({
+                                        role: msg.role === 'model' ? 'assistant' : msg.role,
+                                        content: msg.parts[0].text
+                                    })),
+                                    {
+                                        role: 'user',
+                                        content: userMessage
+                                    }
+                                ],
+                                model: selectedModel,
+                                max_tokens: currentModelConfig.max_tokens,
+                                temperature: currentModelConfig.temperature,
+                                top_p: currentModelConfig.top_p
+                            })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Lỗi khi gọi API Hyperbolic');
+                        }
+
+                        const result = await response.json();
+                        const fullResponse = result.choices[0].message.content;
+
+                        setChatHistory(prev => [...prev, {
+                            role: 'model',
+                            parts: [{ text: fullResponse }]
+                        }]);
+
+                        setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
                     }
-
-                    const result = await response.json();
-                    const fullResponse = result.choices[0].message.content;
-
-                    setChatHistory(prev => [...prev, {
-                        role: 'model',
-                        parts: [{ text: fullResponse }]
-                    }]);
-
-                    setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
                 } catch (error) {
-                    console.error('Lỗi khi sử dụng Hyperbolic:', error);
-                    toast.error('Không thể kết nối với Hyperbolic AI');
+                    console.error('Lỗi:', error);
+                    toast.error('Có lỗi xảy ra');
                 }
             } else if (mode.image && togetherModel) {
                 let imageUrls: string[] = [];
