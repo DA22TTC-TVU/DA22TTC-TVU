@@ -3,8 +3,19 @@ import React, { useState, useEffect } from 'react';
 import { getDatabaseInstance } from '../lib/firebaseConfig';
 import { ref, onValue, push, set, remove } from 'firebase/database';
 import { createPortal } from 'react-dom';
-import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+
+import dynamic from 'next/dynamic';
+
+// Dynamic imports
+const Modal = dynamic(() =>
+    import('./Modal').then((mod) => ({
+        default: ({ children, ...props }) => createPortal(children, document.body)
+    })),
+    { ssr: false }
+);
+
+const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
 
 interface Notification {
     id: string;
@@ -290,153 +301,154 @@ export default function Notification() {
                 )}
             </button>
 
-            {isModalOpen && isMounted && createPortal(
-                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-4xl rounded-2xl shadow-xl max-h-[90vh] flex flex-col">
-                        {/* Header với thanh tìm kiếm */}
-                        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between gap-4">
-                            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Thông Báo</h3>
-                            <div className="flex items-center gap-4">
-                                <div className="relative flex-1 sm:flex-none">
-                                    <input
-                                        type="text"
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        placeholder="Tìm kiếm..."
-                                        className="w-full sm:w-auto px-4 py-2 pr-10 rounded-lg bg-gray-100 
-                                                 dark:bg-gray-700 border-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <svg className="w-5 h-5 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
-                                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
+            {isModalOpen && (
+                <Modal>
+                    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white dark:bg-gray-800 w-full max-w-4xl rounded-2xl shadow-xl max-h-[90vh] flex flex-col">
+                            {/* Header với thanh tìm kiếm */}
+                            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between gap-4">
+                                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Thông Báo</h3>
+                                <div className="flex items-center gap-4">
+                                    <div className="relative flex-1 sm:flex-none">
+                                        <input
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            placeholder="Tìm kiếm..."
+                                            className="w-full sm:w-auto px-4 py-2 pr-10 rounded-lg bg-gray-100 
+                                                     dark:bg-gray-700 border-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <svg className="w-5 h-5 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                    </div>
+                                    <button onClick={() => setIsModalOpen(false)}
+                                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
                                 </div>
-                                <button onClick={() => setIsModalOpen(false)}
-                                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                            </div>
+
+                            {/* Toolbar */}
+                            <div className="p-4 border-b border-gray-200 dark:border-gray-700 
+                                          flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                <div className="flex flex-wrap gap-4 items-center w-full sm:w-auto">
+                                    <select
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value as 'newest' | 'important')}
+                                        className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-none 
+                                                 focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="newest">Mới nhất</option>
+                                        <option value="important">Quan trọng</option>
+                                    </select>
+
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id="showImportant"
+                                            checked={showOnlyImportant}
+                                            onChange={(e) => setShowOnlyImportant(e.target.checked)}
+                                            className="rounded border-gray-300 dark:border-gray-600 
+                                                     text-blue-500 focus:ring-blue-500"
+                                        />
+                                        <label htmlFor="showImportant"
+                                            className="text-sm text-gray-600 dark:text-gray-300">
+                                            Chỉ hiện thông báo quan trọng
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={() => setViewMode('create')}
+                                    className="w-full sm:w-auto px-4 py-2 bg-blue-500 hover:bg-blue-600 
+                                             text-white rounded-lg flex items-center justify-center gap-2"
+                                >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                            d="M6 18L18 6M6 6l12 12" />
+                                            d="M12 4v16m8-8H4" />
                                     </svg>
+                                    <span>Tạo thông báo mới</span>
                                 </button>
                             </div>
-                        </div>
 
-                        {/* Toolbar */}
-                        <div className="p-4 border-b border-gray-200 dark:border-gray-700 
-                                      flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                            <div className="flex flex-wrap gap-4 items-center w-full sm:w-auto">
-                                <select
-                                    value={sortBy}
-                                    onChange={(e) => setSortBy(e.target.value as 'newest' | 'important')}
-                                    className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-none 
-                                             focus:ring-2 focus:ring-blue-500"
-                                >
-                                    <option value="newest">Mới nhất</option>
-                                    <option value="important">Quan trọng</option>
-                                </select>
-
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        id="showImportant"
-                                        checked={showOnlyImportant}
-                                        onChange={(e) => setShowOnlyImportant(e.target.checked)}
-                                        className="rounded border-gray-300 dark:border-gray-600 
-                                                 text-blue-500 focus:ring-blue-500"
-                                    />
-                                    <label htmlFor="showImportant"
-                                        className="text-sm text-gray-600 dark:text-gray-300">
-                                        Chỉ hiện thông báo quan trọng
-                                    </label>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={() => setViewMode('create')}
-                                className="w-full sm:w-auto px-4 py-2 bg-blue-500 hover:bg-blue-600 
-                                         text-white rounded-lg flex items-center justify-center gap-2"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                        d="M12 4v16m8-8H4" />
-                                </svg>
-                                <span>Tạo thông báo mới</span>
-                            </button>
-                        </div>
-
-                        {/* Content Area */}
-                        <div className="flex-1 overflow-y-auto p-4">
-                            {viewMode === 'list' ? (
-                                <div className="space-y-4">
-                                    {filteredNotifications.length === 0 ? (
-                                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                                            {searchQuery ? 'Không tìm thấy thông báo phù hợp' : 'Chưa có thông báo nào'}
-                                        </div>
-                                    ) : (
-                                        filteredNotifications.map(notification => (
-                                            <div
-                                                key={notification.id}
-                                                className={`p-4 rounded-lg transition-all duration-200 
-                                                    ${notification.important
-                                                        ? 'bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500'
-                                                        : 'bg-gray-50 dark:bg-gray-700'}`}
-                                            >
-                                                <div className="flex flex-col sm:flex-row justify-between gap-4">
-                                                    <div className="space-y-2 flex-1">
-                                                        <h4
-                                                            onClick={() => handleViewNotification(notification)}
-                                                            className="text-lg sm:text-xl font-semibold hover:text-blue-500 
-                                                                     cursor-pointer transition-colors"
-                                                        >
-                                                            {notification.title}
-                                                        </h4>
-                                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 
-                                                                      text-sm text-gray-500 dark:text-gray-400">
-                                                            <span className="flex items-center gap-1">
-                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor"
-                                                                    viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                                </svg>
-                                                                {new Date(notification.timestamp).toLocaleDateString()}
-                                                            </span>
-                                                            {notification.attachments && notification.attachments.length > 0 && (
+                            {/* Content Area */}
+                            <div className="flex-1 overflow-y-auto p-4">
+                                {viewMode === 'list' ? (
+                                    <div className="space-y-4">
+                                        {filteredNotifications.length === 0 ? (
+                                            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                                {searchQuery ? 'Không tìm thấy thông báo phù hợp' : 'Chưa có thông báo nào'}
+                                            </div>
+                                        ) : (
+                                            filteredNotifications.map(notification => (
+                                                <div
+                                                    key={notification.id}
+                                                    className={`p-4 rounded-lg transition-all duration-200 
+                                                        ${notification.important
+                                                            ? 'bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500'
+                                                            : 'bg-gray-50 dark:bg-gray-700'}`}
+                                                >
+                                                    <div className="flex flex-col sm:flex-row justify-between gap-4">
+                                                        <div className="space-y-2 flex-1">
+                                                            <h4
+                                                                onClick={() => handleViewNotification(notification)}
+                                                                className="text-lg sm:text-xl font-semibold hover:text-blue-500 
+                                                                         cursor-pointer transition-colors"
+                                                            >
+                                                                {notification.title}
+                                                            </h4>
+                                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 
+                                                                          text-sm text-gray-500 dark:text-gray-400">
                                                                 <span className="flex items-center gap-1">
                                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor"
                                                                         viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                                            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                                     </svg>
-                                                                    {notification.attachments.length} tệp đính kèm
+                                                                    {new Date(notification.timestamp).toLocaleDateString()}
                                                                 </span>
-                                                            )}
+                                                                {notification.attachments && notification.attachments.length > 0 && (
+                                                                    <span className="flex items-center gap-1">
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor"
+                                                                            viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                                        </svg>
+                                                                        {notification.attachments.length} tệp đính kèm
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
+                                                        <button
+                                                            onClick={() => handleDeleteNotification(notification.id)}
+                                                            className="text-gray-500 hover:text-red-500 transition-colors"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor"
+                                                                viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </button>
                                                     </div>
-                                                    <button
-                                                        onClick={() => handleDeleteNotification(notification.id)}
-                                                        className="text-gray-500 hover:text-red-500 transition-colors"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor"
-                                                            viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
-                                                    </button>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            ) : viewMode === 'create' ? (
-                                <NotificationCreateForm />
-                            ) : (
-                                <NotificationDetail />
-                            )}
+                                            ))
+                                        )}
+                                    </div>
+                                ) : viewMode === 'create' ? (
+                                    <NotificationCreateForm />
+                                ) : (
+                                    <NotificationDetail />
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>,
-                document.body
+                </Modal>
             )}
         </>
     );
