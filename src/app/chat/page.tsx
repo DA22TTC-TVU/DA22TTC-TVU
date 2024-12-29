@@ -12,6 +12,11 @@ import Groq from 'groq-sdk';
 import Together from "together-ai";
 import ChatSidebar from './components/ChatSidebar';
 
+interface ChatInputProps {
+    selectedModel: string;
+    setSelectedModel: React.Dispatch<React.SetStateAction<string>>;
+}
+
 export default function ChatPage() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
@@ -39,11 +44,41 @@ export default function ChatPage() {
         search: false,
         speed: false,
         image: false,
+        experiment: false,
     });
     const [stopGenerating, setStopGenerating] = useState<(() => void) | null>(null);
     const { theme } = useTheme();
     const [groqModel, setGroqModel] = useState<Groq | null>(null);
     const [togetherModel, setTogetherModel] = useState<Together | null>(null);
+    const [selectedModel, setSelectedModel] = useState('deepseek-ai/DeepSeek-V3');
+
+    const modelConfigs = {
+        'deepseek-ai/DeepSeek-V3': {
+            max_tokens: 512,
+            temperature: 0.7,
+            top_p: 0.9,
+        },
+        'Qwen/QwQ-32B-Preview': {
+            max_tokens: 512,
+            temperature: 0.1,
+            top_p: 0.9,
+        },
+        'meta-llama/Llama-3.3-70B-Instruct': {
+            max_tokens: 512,
+            temperature: 0.1,
+            top_p: 0.9,
+        },
+        'Qwen/Qwen2.5-Coder-32B-Instruct': {
+            max_tokens: 512,
+            temperature: 0.1,
+            top_p: 0.9,
+        },
+        'default': {
+            max_tokens: 512,
+            temperature: 0.1,
+            top_p: 0.9,
+        }
+    };
 
     useEffect(() => {
         const initGroq = async () => {
@@ -247,7 +282,69 @@ export default function ChatPage() {
         setStreamingText('');
 
         try {
-            if (mode.image && togetherModel) {
+            if (mode.experiment) {
+                try {
+                    setChatHistory(prev => [...prev, {
+                        role: 'user',
+                        parts: [{ text: userMessage }]
+                    }]);
+
+                    setMessages(prev => [...prev, {
+                        role: 'user',
+                        content: userMessage
+                    }]);
+
+                    const apiResponse = await fetch('/api/drive/ai-search');
+                    const { hyperbolicApiKey } = await apiResponse.json();
+
+                    if (!hyperbolicApiKey) {
+                        throw new Error('Không tìm thấy Hyperbolic API key');
+                    }
+
+                    const currentModelConfig = modelConfigs[selectedModel as keyof typeof modelConfigs] || modelConfigs.default;
+
+                    const response = await fetch("https://api.hyperbolic.xyz/v1/chat/completions", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${hyperbolicApiKey}`
+                        },
+                        body: JSON.stringify({
+                            messages: [
+                                ...chatHistory.map(msg => ({
+                                    role: msg.role === 'model' ? 'assistant' : msg.role,
+                                    content: msg.parts[0].text
+                                })),
+                                {
+                                    role: 'user',
+                                    content: userMessage
+                                }
+                            ],
+                            model: selectedModel,
+                            max_tokens: currentModelConfig.max_tokens,
+                            temperature: currentModelConfig.temperature,
+                            top_p: currentModelConfig.top_p
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Lỗi khi gọi API Hyperbolic');
+                    }
+
+                    const result = await response.json();
+                    const fullResponse = result.choices[0].message.content;
+
+                    setChatHistory(prev => [...prev, {
+                        role: 'model',
+                        parts: [{ text: fullResponse }]
+                    }]);
+
+                    setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
+                } catch (error) {
+                    console.error('Lỗi khi sử dụng Hyperbolic:', error);
+                    toast.error('Không thể kết nối với Hyperbolic AI');
+                }
+            } else if (mode.image && togetherModel) {
                 let imageUrls: string[] = [];
                 let files = [...filePreviews];
 
@@ -304,163 +401,161 @@ export default function ChatPage() {
                     };
                     return newMessages;
                 });
-            } else {
-                if (mode.speed && groqModel) {
-                    setChatHistory(prev => [...prev, {
-                        role: 'user',
-                        parts: [{ text: userMessage }]
-                    }]);
+            } else if (mode.speed && groqModel) {
+                setChatHistory(prev => [...prev, {
+                    role: 'user',
+                    parts: [{ text: userMessage }]
+                }]);
 
-                    setMessages(prev => [...prev, {
-                        role: 'user',
-                        content: userMessage
-                    }]);
+                setMessages(prev => [...prev, {
+                    role: 'user',
+                    content: userMessage
+                }]);
 
-                    const chatCompletion = await groqModel.chat.completions.create({
-                        messages: [
-                            ...chatHistory.map(msg => ({
-                                role: msg.role === 'model' ? 'assistant' : msg.role,
-                                content: msg.parts[0].text
-                            })),
-                            {
-                                role: 'user',
-                                content: userMessage
-                            }
-                        ],
-                        model: "llama-3.3-70b-versatile",
-                        temperature: 1,
-                        max_tokens: 1024,
-                        top_p: 1,
-                        stream: true
-                    } as any);
-
-                    let fullResponse = '';
-                    const controller = new AbortController();
-                    setStopGenerating(() => () => controller.abort());
-
-                    try {
-                        for await (const chunk of chatCompletion as any) {
-                            if (controller.signal.aborted) break;
-                            const chunkText = chunk.choices[0]?.delta?.content || '';
-                            fullResponse += chunkText;
-                            setStreamingText(fullResponse);
+                const chatCompletion = await groqModel.chat.completions.create({
+                    messages: [
+                        ...chatHistory.map(msg => ({
+                            role: msg.role === 'model' ? 'assistant' : msg.role,
+                            content: msg.parts[0].text
+                        })),
+                        {
+                            role: 'user',
+                            content: userMessage
                         }
-                    } catch (error: any) {
-                        if (error.name === 'AbortError') {
-                            console.log('Đã dừng sinh văn bản');
-                        } else {
-                            throw error;
-                        }
+                    ],
+                    model: "llama-3.3-70b-versatile",
+                    temperature: 1,
+                    max_tokens: 1024,
+                    top_p: 1,
+                    stream: true
+                } as any);
+
+                let fullResponse = '';
+                const controller = new AbortController();
+                setStopGenerating(() => () => controller.abort());
+
+                try {
+                    for await (const chunk of chatCompletion as any) {
+                        if (controller.signal.aborted) break;
+                        const chunkText = chunk.choices[0]?.delta?.content || '';
+                        fullResponse += chunkText;
+                        setStreamingText(fullResponse);
                     }
-
-                    setChatHistory(prev => [...prev, {
-                        role: 'model',
-                        parts: [{ text: fullResponse }]
-                    }]);
-
-                    setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
-                    setStreamingText('');
-
-                } else {
-                    const newChat = model.model.startChat({
-                        generationConfig: model.generationConfig,
-                        history: chatHistory
-                    });
-
-                    let parts = [];
-                    let imageUrls: string[] = [];
-                    let files = [...filePreviews];
-
-                    if (selectedImages.length > 0 && imagePreviews.length > 0) {
-                        imageUrls = [...imagePreviews];
-                        for (const preview of imagePreviews) {
-                            const imageData = preview.split(',')[1] || '';
-                            const imagePart: ImagePart = {
-                                inlineData: {
-                                    data: imageData,
-                                    mimeType: selectedImages[0].type,
-                                }
-                            };
-                            parts.push(imagePart);
-                        }
+                } catch (error: any) {
+                    if (error.name === 'AbortError') {
+                        console.log('Đã dừng sinh văn bản');
+                    } else {
+                        throw error;
                     }
-
-                    if (userMessage) {
-                        parts.push(userMessage);
-                    }
-
-                    if (selectedFiles.length > 0) {
-                        for (const file of selectedFiles) {
-                            const reader = new FileReader();
-                            const fileData = await new Promise<string>((resolve) => {
-                                reader.onloadend = () => {
-                                    const base64Data = reader.result as string;
-                                    resolve(base64Data.split(',')[1] || '');
-                                };
-                                reader.readAsDataURL(file);
-                            });
-
-                            parts.push({
-                                inlineData: {
-                                    data: fileData,
-                                    mimeType: file.type
-                                }
-                            });
-                        }
-                    }
-
-                    setChatHistory(prev => [...prev, {
-                        role: 'user',
-                        parts: [{ text: userMessage }]
-                    }]);
-
-                    setMessages(prev => [...prev, {
-                        role: 'user',
-                        content: userMessage,
-                        imageUrls: imageUrls,
-                        files: files
-                    }]);
-
-                    handleRemoveImage();
-                    setSelectedFiles([]);
-                    setFilePreviews([]);
-                    if (documentInputRef.current) {
-                        documentInputRef.current.value = '';
-                    }
-
-                    const result = await newChat.sendMessageStream(parts);
-                    let fullResponse = '';
-
-                    const controller = new AbortController();
-                    setStopGenerating(() => () => controller.abort());
-
-                    try {
-                        for await (const chunk of result.stream) {
-                            if (controller.signal.aborted) {
-                                break;
-                            }
-                            const chunkText = chunk.text();
-                            fullResponse += chunkText;
-                            setStreamingText(fullResponse);
-                        }
-                    } catch (error: any) {
-                        if (error.name === 'AbortError') {
-                            console.log('Đã dừng sinh văn bản');
-                        } else {
-                            throw error;
-                        }
-                    }
-
-                    setChatHistory(prev => [...prev, {
-                        role: 'model',
-                        parts: [{ text: fullResponse }]
-                    }]);
-
-                    setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
-                    setStreamingText('');
-
-                    setModel((prev: any) => ({ ...prev, chat: newChat }));
                 }
+
+                setChatHistory(prev => [...prev, {
+                    role: 'model',
+                    parts: [{ text: fullResponse }]
+                }]);
+
+                setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
+                setStreamingText('');
+
+            } else {
+                const newChat = model.model.startChat({
+                    generationConfig: model.generationConfig,
+                    history: chatHistory
+                });
+
+                let parts = [];
+                let imageUrls: string[] = [];
+                let files = [...filePreviews];
+
+                if (selectedImages.length > 0 && imagePreviews.length > 0) {
+                    imageUrls = [...imagePreviews];
+                    for (const preview of imagePreviews) {
+                        const imageData = preview.split(',')[1] || '';
+                        const imagePart: ImagePart = {
+                            inlineData: {
+                                data: imageData,
+                                mimeType: selectedImages[0].type,
+                            }
+                        };
+                        parts.push(imagePart);
+                    }
+                }
+
+                if (userMessage) {
+                    parts.push(userMessage);
+                }
+
+                if (selectedFiles.length > 0) {
+                    for (const file of selectedFiles) {
+                        const reader = new FileReader();
+                        const fileData = await new Promise<string>((resolve) => {
+                            reader.onloadend = () => {
+                                const base64Data = reader.result as string;
+                                resolve(base64Data.split(',')[1] || '');
+                            };
+                            reader.readAsDataURL(file);
+                        });
+
+                        parts.push({
+                            inlineData: {
+                                data: fileData,
+                                mimeType: file.type
+                            }
+                        });
+                    }
+                }
+
+                setChatHistory(prev => [...prev, {
+                    role: 'user',
+                    parts: [{ text: userMessage }]
+                }]);
+
+                setMessages(prev => [...prev, {
+                    role: 'user',
+                    content: userMessage,
+                    imageUrls: imageUrls,
+                    files: files
+                }]);
+
+                handleRemoveImage();
+                setSelectedFiles([]);
+                setFilePreviews([]);
+                if (documentInputRef.current) {
+                    documentInputRef.current.value = '';
+                }
+
+                const result = await newChat.sendMessageStream(parts);
+                let fullResponse = '';
+
+                const controller = new AbortController();
+                setStopGenerating(() => () => controller.abort());
+
+                try {
+                    for await (const chunk of result.stream) {
+                        if (controller.signal.aborted) {
+                            break;
+                        }
+                        const chunkText = chunk.text();
+                        fullResponse += chunkText;
+                        setStreamingText(fullResponse);
+                    }
+                } catch (error: any) {
+                    if (error.name === 'AbortError') {
+                        console.log('Đã dừng sinh văn bản');
+                    } else {
+                        throw error;
+                    }
+                }
+
+                setChatHistory(prev => [...prev, {
+                    role: 'model',
+                    parts: [{ text: fullResponse }]
+                }]);
+
+                setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
+                setStreamingText('');
+
+                setModel((prev: any) => ({ ...prev, chat: newChat }));
             }
 
         } catch (error) {
@@ -624,6 +719,8 @@ export default function ChatPage() {
                                 setMode={setMode}
                                 stopGenerating={stopGenerating}
                                 clearChat={clearChat}
+                                selectedModel={selectedModel}
+                                setSelectedModel={setSelectedModel}
                             />
                         </div>
                     </div>
