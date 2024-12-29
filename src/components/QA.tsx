@@ -45,6 +45,7 @@ export default function QA() {
     const [showOnlyUnsolved, setShowOnlyUnsolved] = useState(false);
     const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
     const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
         const fetchQuestions = async () => {
@@ -75,6 +76,10 @@ export default function QA() {
         };
 
         fetchQuestions();
+    }, []);
+
+    useEffect(() => {
+        setIsMounted(true);
     }, []);
 
     const handleAskQuestion = async () => {
@@ -382,7 +387,7 @@ export default function QA() {
                 )}
             </button>
 
-            {isModalOpen && createPortal(
+            {isModalOpen && isMounted && createPortal(
                 <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-gray-800 w-full max-w-4xl rounded-2xl shadow-xl max-h-[90vh] flex flex-col">
                         {/* Header */}

@@ -34,6 +34,7 @@ export default function Notification() {
     const [searchQuery, setSearchQuery] = useState('');
     const [sortBy, setSortBy] = useState<'newest' | 'important'>('newest');
     const [showOnlyImportant, setShowOnlyImportant] = useState(false);
+    const [isMounted, setIsMounted] = useState(false);
 
     // Cấu hình ReactQuill
     const modules = {
@@ -52,6 +53,10 @@ export default function Notification() {
         'list', 'bullet', 'indent',
         'link', 'image'
     ];
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     useEffect(() => {
         const fetchNotifications = async () => {
@@ -285,7 +290,7 @@ export default function Notification() {
                 )}
             </button>
 
-            {isModalOpen && createPortal(
+            {isModalOpen && isMounted && createPortal(
                 <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-gray-800 w-full max-w-4xl rounded-2xl shadow-xl max-h-[90vh] flex flex-col">
                         {/* Header với thanh tìm kiếm */}
