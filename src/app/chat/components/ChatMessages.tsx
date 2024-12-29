@@ -47,9 +47,23 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
         }
     }, [messages, streamingText]);
 
-    const copyToClipboard = async (text: string) => {
+    const copyToClipboard = async (text: string, stripMarkdown: boolean = false) => {
         try {
-            await navigator.clipboard.writeText(text);
+            let finalText = text;
+            if (stripMarkdown) {
+                // Loại bỏ các ký hiệu markdown phổ biến
+                finalText = text
+                    .replace(/```[\s\S]*?```/g, '') // Xóa code blocks
+                    .replace(/`([^`]+)`/g, '$1') // Xóa inline code
+                    .replace(/\*\*([^*]+)\*\*/g, '$1') // Xóa bold
+                    .replace(/\*([^*]+)\*/g, '$1') // Xóa italic
+                    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Xóa links
+                    .replace(/#{1,6}\s/g, '') // Xóa headings
+                    .replace(/>\s[^\n]+/g, '') // Xóa blockquotes
+                    .replace(/- /g, '') // Xóa bullet points
+                    .trim();
+            }
+            await navigator.clipboard.writeText(finalText);
             toast.success('Đã sao chép vào clipboard');
         } catch (err) {
             toast.error('Không thể sao chép');
@@ -343,7 +357,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                 </div>
                                 {(message.generatedImages?.[0]?.isLoading) || message.content !== 'Đang tạo ảnh...' && (
                                     <div className={`flex mt-1 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-2 absolute">
                                             <button
                                                 onClick={() => {
                                                     const messageElement = document.getElementById(`message-${index}`);
@@ -377,6 +391,17 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                             >
                                                 <FontAwesomeIcon icon={faCopy} className="text-gray-500 dark:text-gray-300 w-3 h-3" />
                                             </button>
+                                            {message.role === 'assistant' && (
+                                                <button
+                                                    onClick={() => copyToClipboard(message.content, true)}
+                                                    className="opacity-0 group-hover:opacity-100 p-2 bg-gray-200 dark:bg-gray-700 rounded-lg 
+                                                        hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-200 flex items-center gap-2 text-sm"
+                                                    title="Sao chép văn bản (không có markdown)"
+                                                >
+                                                    <FontAwesomeIcon icon={faCopy} className="text-gray-500 dark:text-gray-300 w-3 h-3" />
+                                                    <span className="text-xs">Text</span>
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => deleteMessage(index)}
                                                 className="opacity-0 group-hover:opacity-100 p-2 bg-gray-200 dark:bg-gray-700 rounded-lg 
