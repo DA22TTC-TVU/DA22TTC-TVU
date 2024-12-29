@@ -41,11 +41,23 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
 
     useEffect(() => {
         if (streamingText) {
-            streamEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            streamEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
         } else {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
     }, [messages, streamingText]);
+
+    useEffect(() => {
+        if (messages.length > 0) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'auto';
+        }
+
+        return () => {
+            document.body.style.overflow = 'auto';
+        };
+    }, [messages.length]);
 
     const copyToClipboard = async (text: string, stripMarkdown: boolean = false) => {
         try {
