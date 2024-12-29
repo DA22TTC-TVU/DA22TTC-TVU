@@ -5,6 +5,8 @@ import { getDatabaseInstance } from '../lib/firebaseConfig';
 import { ref, onValue } from 'firebase/database';
 import dynamic from 'next/dynamic';
 import Chat from './Chat';
+import QA from './QA';
+import Notification from './Notification';
 
 const Broadcast = dynamic(() => import('./Broadcast'), {
     ssr: false // Tắt Server Side Rendering cho component này
@@ -196,6 +198,8 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
                                     </span>
                                 )}
                             </div>
+                            <QA />
+                            <Notification />
                         </div>
                     </>
                 )}
