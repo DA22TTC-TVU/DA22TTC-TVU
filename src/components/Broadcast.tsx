@@ -183,8 +183,6 @@ export default function Broadcast({ isModalOpen, setIsModalOpen }: BroadcastProp
                     </svg>
                     <span className="flex items-center gap-2">
                         Phát Sóng
-                        <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900 
-                            text-blue-600 dark:text-blue-400 rounded">Beta</span>
                     </span>
                 </div>
             )}

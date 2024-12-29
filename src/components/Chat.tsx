@@ -346,8 +346,6 @@ export default function Chat() {
                     </svg>
                     <span className="flex items-center gap-2">
                         Trò Chuyện
-                        <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900 
-                                            text-blue-600 dark:text-blue-400 rounded">Beta</span>
                     </span>
                 </div>
             </button>
@@ -363,8 +361,6 @@ export default function Chat() {
                                 <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
                                     Trò Chuyện
                                 </h3>
-                                <span className="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900 
-                                    text-blue-600 dark:text-blue-400 rounded-full">Beta</span>
                             </div>
                             <button
                                 onClick={() => setIsChatOpen(false)}
