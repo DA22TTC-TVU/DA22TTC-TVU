@@ -34,6 +34,27 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
     const folderInputRef = React.useRef<HTMLInputElement>(null);
     const [isModalOpen, setIsModalOpen] = React.useState(false);
     const [isInteractionOpen, setIsInteractionOpen] = React.useState(false);
+    const [isDarkTheme, setIsDarkTheme] = React.useState(false);
+
+    React.useEffect(() => {
+        const isDark = document.documentElement.classList.contains('dark');
+        setIsDarkTheme(isDark);
+
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'class') {
+                    setIsDarkTheme(document.documentElement.classList.contains('dark'));
+                }
+            });
+        });
+
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class']
+        });
+
+        return () => observer.disconnect();
+    }, []);
 
     const handleCreateFolder = () => {
         onClose();
@@ -210,7 +231,7 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
 
                             <QA />
                             <Notification />
-                            <System203 />
+                            {isDarkTheme && <System203 />}
                         </div>
                     </>
                 )}
