@@ -31,7 +31,7 @@
     "filepond-plugin-file-validate-type": "^1.2.9",
     "firebase": "^10.13.1",
     "firebase-storage": "^1.1.4",
-    "framer-motion": "^11.4.0",
+    "framer-motion": "^11.15.0",
     "googleapis": "^144.0.0",
     "groq-sdk": "^0.9.1",
     "gsap": "^3.12.5",

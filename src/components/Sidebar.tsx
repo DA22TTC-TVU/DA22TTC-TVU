@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import Chat from './Chat';
 import QA from './QA';
 import Notification from './Notification';
+import System203 from './System203';
 
 const Broadcast = dynamic(() => import('./Broadcast'), {
     ssr: false // Tắt Server Side Rendering cho component này
@@ -32,6 +33,7 @@ interface SidebarProps {
 export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUploadFolder, formatBytes, isOpen, onClose, fileInputRef, isLoading = false }: SidebarProps) {
     const folderInputRef = React.useRef<HTMLInputElement>(null);
     const [isModalOpen, setIsModalOpen] = React.useState(false);
+    const [isInteractionOpen, setIsInteractionOpen] = React.useState(false);
 
     const handleCreateFolder = () => {
         onClose();
@@ -161,23 +163,54 @@ export default function Sidebar({ driveInfo, onCreateFolder, onUploadFile, onUpl
 
                         <div className="mt-6">
                             <div className="flex items-center space-x-3 px-6 py-3.5 rounded-xl hover:bg-gray-100 
-                            transition-colors text-gray-700 font-medium">
+                            transition-colors text-gray-700 dark:text-gray-200 font-medium">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                                 </svg>
                                 <span>DA22TTC</span>
                             </div>
-                            <Chat />
-                            <div
-                                className="w-full flex items-center justify-between px-6 py-3.5 rounded-xl
+
+                            <div>
+                                <div
+                                    className="flex items-center justify-between px-6 py-3.5 rounded-xl
                                     hover:bg-gray-100 dark:hover:bg-gray-700
                                     transition-colors text-gray-700 dark:text-gray-200 font-medium cursor-pointer"
-                                onClick={() => setIsModalOpen(true)}
-                            >
-                                <Broadcast isModalOpen={isModalOpen} setIsModalOpen={setIsModalOpen} />
+                                    onClick={() => setIsInteractionOpen(!isInteractionOpen)}
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
+                                        </svg>
+                                        <span>Tương Tác</span>
+                                    </div>
+                                    <svg
+                                        className={`w-4 h-4 transition-transform ${isInteractionOpen ? 'rotate-180' : ''}`}
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
+
+                                {isInteractionOpen && (
+                                    <div className="ml-6 space-y-2 mt-2">
+                                        <Chat />
+                                        <div
+                                            className="flex items-center space-x-3 px-6 py-3.5 rounded-xl
+                                            hover:bg-gray-100 dark:hover:bg-gray-700
+                                            transition-colors text-gray-700 dark:text-gray-200 font-medium cursor-pointer"
+                                            onClick={() => setIsModalOpen(true)}
+                                        >
+                                            <Broadcast isModalOpen={isModalOpen} setIsModalOpen={setIsModalOpen} />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
+
                             <QA />
                             <Notification />
+                            <System203 />
                         </div>
                     </>
                 )}
