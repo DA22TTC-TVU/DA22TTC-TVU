@@ -29,18 +29,14 @@ interface ChatInputProps {
         search: boolean;
         speed: boolean;
         image: boolean;
-        experiment: boolean;
     };
     setMode: React.Dispatch<React.SetStateAction<{
         search: boolean;
         speed: boolean;
         image: boolean;
-        experiment: boolean;
     }>>;
     stopGenerating: (() => void) | null;
     clearChat: () => void;
-    selectedModel: string;
-    setSelectedModel: React.Dispatch<React.SetStateAction<string>>;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
@@ -63,8 +59,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setMode,
     stopGenerating,
     clearChat,
-    selectedModel,
-    setSelectedModel
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [imageLoadingStates, setImageLoadingStates] = useState<boolean[]>([]);
@@ -73,34 +67,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
     const [showModelSelector, setShowModelSelector] = useState(false);
     const [customModel, setCustomModel] = useState('');
     const [showExpandedInput, setShowExpandedInput] = useState(false);
-
-    const availableModels = [
-        {
-            id: 'deepseek-ai/DeepSeek-V3',
-            name: 'DeepSeek V3',
-            type: 'text'
-        },
-        {
-            id: 'Qwen/QwQ-32B-Preview',
-            name: 'QwQ 32B',
-            type: 'text'
-        },
-        {
-            id: 'meta-llama/Llama-3.3-70B-Instruct',
-            name: 'Llama 3.3',
-            type: 'text'
-        },
-        {
-            id: 'Qwen/Qwen2.5-Coder-32B-Instruct',
-            name: 'Qwen Coder',
-            type: 'text'
-        },
-        {
-            id: 'FLUX.1-dev',
-            name: 'FLUX Dev',
-            type: 'image'
-        }
-    ];
 
     const debouncedSetInput = useMemo(
         () => debounce((value: string) => {
@@ -219,17 +185,16 @@ const ChatInput: React.FC<ChatInputProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const handleModeChange = (modeType: 'search' | 'speed' | 'image' | 'experiment') => {
+    const handleModeChange = (modeType: 'search' | 'speed' | 'image') => {
         setMode(prev => {
             const newMode = {
                 search: modeType === 'search' ? !prev.search : false,
                 speed: modeType === 'speed' ? !prev.speed : false,
                 image: modeType === 'image' ? !prev.image : false,
-                experiment: modeType === 'experiment' ? !prev.experiment : false,
             };
 
             // Nếu bật chế độ speed hoặc experiment, xóa tất cả ảnh và file đã tải lên
-            if ((modeType === 'speed' && !prev.speed) || (modeType === 'experiment' && !prev.experiment)) {
+            if ((modeType === 'speed' && !prev.speed)) {
                 handleRemoveImage();
                 setSelectedFiles([]);
                 setFilePreviews([]);
@@ -604,24 +569,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
                                                 </span>
                                             </label>
                                         </div>
-                                        <div className="flex items-center justify-between sm:flex hidden">
-                                            <label className="inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={mode.experiment}
-                                                    onChange={() => handleModeChange('experiment')}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="relative w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-500"></div>
-                                                <span className="ml-3 text-base font-medium text-gray-900 dark:text-gray-300">
-                                                    🧪 Test
-                                                </span>
-                                            </label>
-                                        </div>
                                     </div>
                                 )}
                             </div>
-
                             {/* Input và button mới */}
                             <input
                                 type="file"
@@ -632,8 +582,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                                 multiple
                                 className="hidden"
                             />
-                            {!mode.experiment ? ( // Thêm điều kiện để ẩn nút tải ảnh khi ở chế độ experiment
-                                <button
+                            <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
                                     disabled={mode.speed} // Disable trong chế độ speed
@@ -666,77 +615,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
                                         {mode.speed ? "Không khả dụng trong chế độ này" : "Tải lên"}
                                     </span>
                                 </button>
-                            ) : (
-                                <div className="relative">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowModelSelector(!showModelSelector)}
-                                        className="p-2.5 
-                                            min-h-[42px]
-                                            flex items-center justify-center gap-2
-                                            bg-white dark:bg-gray-800
-                                            text-gray-600 dark:text-gray-300
-                                            rounded-xl border border-gray-200 dark:border-gray-600
-                                            transition-all duration-200
-                                            group relative
-                                            shadow-sm hover:shadow-md"
-                                    >
-                                        <span className="text-sm truncate max-w-[150px]">{selectedModel.split('/').pop()}</span>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </button>
-
-                                    {showModelSelector && (
-                                        <div className="absolute bottom-full left-0 mb-2 w-[250px] bg-white dark:bg-gray-800 rounded-lg shadow-lg 
-                                        border border-gray-200 dark:border-gray-700 
-                                        p-3 z-50"
-                                        >
-                                            <div className="space-y-2">
-                                                <div className="mb-2 text-sm font-medium text-gray-500 dark:text-gray-400">Tạo văn bản</div>
-                                                {availableModels.filter(model => model.type === 'text').map((model) => (
-                                                    <button
-                                                        key={model.id}
-                                                        onClick={() => {
-                                                            setSelectedModel(model.id);
-                                                            setShowModelSelector(false);
-                                                        }}
-                                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm
-                                                            ${selectedModel === model.id
-                                                                ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400'
-                                                                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                                                            }
-                                                            transition-colors duration-200`}
-                                                    >
-                                                        {model.name}
-                                                    </button>
-                                                ))}
-
-                                                <div className="my-2 border-t border-gray-200 dark:border-gray-700"></div>
-
-                                                <div className="mb-2 text-sm font-medium text-gray-500 dark:text-gray-400">Tạo ảnh</div>
-                                                {availableModels.filter(model => model.type === 'image').map((model) => (
-                                                    <button
-                                                        key={model.id}
-                                                        onClick={() => {
-                                                            setSelectedModel(model.id);
-                                                            setShowModelSelector(false);
-                                                        }}
-                                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm
-                                                            ${selectedModel === model.id
-                                                                ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400'
-                                                                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                                                            }
-                                                            transition-colors duration-200`}
-                                                    >
-                                                        {model.name}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
                         </div>
 
                         <div className="flex flex-1 space-x-1 sm:space-x-2">
