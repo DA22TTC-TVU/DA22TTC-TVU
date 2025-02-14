@@ -109,10 +109,10 @@ export default function Header({ searchTerm, onSearchChange, isAISearch, onToggl
                 <button
                     onClick={() => router.push('/chat')}
                     className="relative group flex items-center gap-2 px-4 py-2 transition-transform duration-300 hover:scale-105"
-                    title="Chat AI"
+                    title="AI-UI"
                 >
                     <ChatBubbleBottomCenterTextIcon className="w-6 h-6 text-blue-500" />
-                    <span className="text-gray-800 dark:text-gray-200">Chat AI</span>
+                    <span className="text-gray-800 dark:text-gray-200">AI-UI</span>
                     <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></span>
                 </button>
 
