@@ -2,7 +2,6 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes'
-import { ChatBubbleBottomCenterTextIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 
 interface HeaderProps {
     searchTerm: string;
@@ -15,10 +14,6 @@ interface HeaderProps {
 export default function Header({ searchTerm, onSearchChange, isAISearch, onToggleAISearch, onSearch }: HeaderProps) {
     const { theme, setTheme } = useTheme();
     const router = useRouter();
-
-    const toggleTheme = () => {
-        setTheme(theme === 'dark' ? 'light' : 'dark');
-    };
 
     return (
         <div className="flex flex-col md:flex-row items-center p-5 gap-4 md:gap-0 
@@ -88,42 +83,43 @@ export default function Header({ searchTerm, onSearchChange, isAISearch, onToggl
                     )}
                 </div>
             </div>
-            <div className="flex items-center gap-6 w-full md:w-auto justify-center">
+            <div className="flex items-center gap-4 w-full md:w-auto justify-center">
                 <button
-                    onClick={toggleTheme}
-                    className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 
-                    transition-transform duration-300 ease-in-out hover:rotate-180 active:scale-90"
-                    title="Chuyển chủ đề giao diện"
+                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    title={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
                 >
-                    {theme === "dark" ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m8.66-12H21m-17 0H3.34M16.95 7.05l.7.7m-12.02 0l.7-.7M16.95 16.95l.7-.7m-12.02 0l.7.7M12 8a4 4 0 110 8 4 4 0 010-8z" />
+                    {theme === 'dark' ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+                            />
                         </svg>
                     ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-gray-900 dark:text-gray-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                            />
                         </svg>
                     )}
                 </button>
 
                 <button
+                    className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-6 py-2.5 rounded-xl
+                    hover:from-purple-600 hover:to-indigo-600 active:scale-95 shadow-md hover:shadow-lg
+                    transition-all duration-200 font-medium"
                     onClick={() => router.push('/chat')}
-                    className="relative group flex items-center gap-2 px-4 py-2 transition-transform duration-300 hover:scale-105"
-                    title="AI-UI"
                 >
-                    <ChatBubbleBottomCenterTextIcon className="w-6 h-6 text-blue-500" />
-                    <span className="text-gray-800 dark:text-gray-200">AI-UI</span>
-                    <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></span>
+                    Chat AI
                 </button>
 
                 <button
+                    className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-2.5 rounded-xl
+                    hover:from-blue-600 hover:to-indigo-600 active:scale-95 shadow-md hover:shadow-lg
+                    transition-all duration-200 font-medium"
                     onClick={() => router.push('/txt')}
-                    className="relative group flex items-center gap-2 px-4 py-2 transition-transform duration-300 hover:scale-105"
-                    title="Ghi chú"
                 >
-                    <PencilSquareIcon className="w-6 h-6 text-blue-500" />
-                    <span className="text-gray-800 dark:text-gray-200">Ghi chú</span>
-                    <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></span>
+                    Ghi chú
                 </button>
             </div>
         </div>
