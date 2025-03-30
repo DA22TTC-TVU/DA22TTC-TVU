@@ -3,21 +3,47 @@
 @tailwind utilities;
 
 @keyframes scan {
-    0% {
-        transform: translateX(-100%);
-    }
+  0% {
+    transform: translateX(-100%);
+  }
 
-    100% {
-        transform: translateX(100%);
-    }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 @keyframes moveRight {
-    0% {
-        transform: translateX(-100%);
-    }
+  0% {
+    transform: translateX(-100%);
+  }
 
-    100% {
-        transform: translateX(100%);
-    }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(400%);
+  }
+}
+
+.animate-scan {
+  animation: scan;
+  animation-fill-mode: forwards;
+}
+
+.animation-duration-3000 {
+  animation-duration: 3s;
+}
+
+.animation-ease-linear {
+  animation-timing-function: linear;
+}
+
+.animation-infinite {
+  animation-iteration-count: infinite;
 }
