@@ -109,10 +109,10 @@ export default function Header({
           )}
         </div>
       </div>
-      <div className="flex items-center gap-4 w-full md:w-auto justify-center">
+      <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto justify-center">
         <button
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors justify-center"
           title={
             theme === "dark"
               ? "Chuyển sang giao diện sáng"
@@ -150,31 +150,33 @@ export default function Header({
           )}
         </button>
 
-        <a
-          href="https://tomichan.vercel.app/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 px-6 py-2.5 rounded-xl
+        <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+          <a
+            href="https://tomichan.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl
                     bg-blue-500 dark:bg-blue-600 text-white
                     hover:bg-blue-600 dark:hover:bg-blue-700
                     active:scale-95
-                    transition-all duration-200 font-medium"
-        >
-          <MessageSquare className="w-5 h-5" />
-          TomiChan
-        </a>
+                    transition-all duration-200 font-medium w-fit"
+          >
+            <MessageSquare className="w-5 h-5" />
+            TomiChan
+          </a>
 
-        <button
-          className="flex items-center gap-2 px-6 py-2.5 rounded-xl
+          <button
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl
                     bg-blue-500 dark:bg-blue-600 text-white
                     hover:bg-blue-600 dark:hover:bg-blue-700 
                     active:scale-95
                     transition-all duration-200 font-medium"
-          onClick={() => router.push("/txt")}
-        >
-          <Notebook className="w-5 h-5" />
-          Ghi chú
-        </button>
+            onClick={() => router.push("/txt")}
+          >
+            <Notebook className="w-5 h-5" />
+            Ghi chú
+          </button>
+        </div>
       </div>
     </div>
   );
